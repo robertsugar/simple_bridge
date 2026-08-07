@@ -43,6 +43,7 @@ let dummy = null;          // a felvevo partnere, teritett lapokkal
 let currentTrick = [];     // {seat, card}
 let tricks = [0, 0];       // [0]: 0-2 szekpar utesei, [1]: 1-3 szekpar utesei
 let trickCount = 0;
+let autoTimer = null;      // auto befejezes idozito
 
 function shuffle(arr) {
     var ctr = arr.length, temp, index;
@@ -140,6 +141,29 @@ function startPlay() {
     promptPlay();
 }
 
+function doPlayCard(acting, card) { // ervenyesitett lap kijatszasa es a jatek leptetese
+    hands[acting] = hands[acting].filter(c => c !== card);
+    currentTrick.push({ seat: acting, card: card });
+    io.emit('cardPlayed', { seat: acting, name: players[acting].name, card: card });
+    if (acting === dummy) {
+        io.emit('dummyHand', { seat: dummy, name: players[dummy].name, cards: hands[dummy] });
+    }
+    if (currentTrick.length === 4) {
+        resolveTrick();
+    }
+    else {
+        turn = (turn + 1) % 4;
+        promptPlay();
+    }
+}
+
+function stopAuto() {
+    if (autoTimer) {
+        clearInterval(autoTimer);
+        autoTimer = null;
+    }
+}
+
 function resolveTrick() {
     const leadSuit = currentTrick[0].card[0];
     let winner = currentTrick[0];
@@ -175,6 +199,7 @@ function resolveTrick() {
 }
 
 function newGame() {
+    stopAuto();
     phase = 'licit';
     contractSeat = null;
     kontraLevel = 0;
@@ -206,6 +231,7 @@ function dropPlayer(sock) {
         const name = players[seat].name;
         players.splice(seat, 1);
         if (phase !== 'varakozas') {
+            stopAuto();
             phase = 'varakozas';
             io.emit('message', name + ' kilepett, a jatek megszakadt. Varakozas negy jatekosra...');
             io.emit('reset');
@@ -318,20 +344,25 @@ io.on('connection', (sock) => {
         const controller = (acting === dummy) ? declarer : acting;
         if (seat !== controller) return;
         if (!legalCards(acting).includes(card)) return;
+        doPlayCard(acting, card);
+    });
 
-        hands[acting] = hands[acting].filter(c => c !== card);
-        currentTrick.push({ seat: acting, card: card });
-        io.emit('cardPlayed', { seat: acting, name: players[acting].name, card: card });
-        if (acting === dummy) {
-            io.emit('dummyHand', { seat: dummy, name: players[dummy].name, cards: hands[dummy] });
-        }
-        if (currentTrick.length === 4) {
-            resolveTrick();
-        }
-        else {
-            turn = (turn + 1) % 4;
-            promptPlay();
-        }
+    //
+    // Auto befejezes: a szerver vegigjatssza a hatralevo uteseket
+    //
+    sock.on('autofinish', () => {
+        if (phase !== 'jatek' || autoTimer) return;
+        const seat = seatOf(sock);
+        if (seat < 0) return;
+        io.emit('message', players[seat].name + ' keresere a parti automatikusan befejezodik...');
+        autoTimer = setInterval(() => {
+            if (phase !== 'jatek') {
+                clearInterval(autoTimer);
+                autoTimer = null;
+                return;
+            }
+            doPlayCard(turn, legalCards(turn)[0]);
+        }, 700);
     });
 
     //

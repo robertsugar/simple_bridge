@@ -122,6 +122,7 @@ function resetGameView() {
     pendingPlay = null;
     clearTable();
     hideBidButtons();
+    hideDiv('auto-butt');
     document.getElementById('terito-area').innerHTML = '';
     renderHand();
     renderDummy();
@@ -158,6 +159,11 @@ const onTerit = (e) => {
     e.preventDefault();
     sock.emit('teritek');
 };
+const onAuto = (e) => {
+    e.preventDefault();
+    sock.emit('autofinish');
+    hideDiv('auto-butt');
+};
 const onBid = (type) => (e) => {
     e.preventDefault();
     sock.emit('bid', type);
@@ -168,6 +174,7 @@ document.getElementById('start-game').addEventListener('submit', onStartGame);
 document.getElementById('chat-form').addEventListener('submit', onChatSubmitted);
 document.getElementById('ujparti-butt').addEventListener('click', onUjParti);
 document.getElementById('teritek-butt').addEventListener('click', onTerit);
+document.getElementById('auto-butt').addEventListener('click', onAuto);
 document.getElementById('passz-butt').addEventListener('click', onBid('passz'));
 document.getElementById('licit-butt').addEventListener('click', onBid('licit'));
 document.getElementById('kontra-butt').addEventListener('click', onBid('kontra'));
@@ -212,6 +219,7 @@ const onEntrySubmitted = (e) => {
         });
         sock.on('contract', () => {
             hideBidButtons();
+            showDiv('auto-butt', 'inline-block');
         });
         sock.on('dummyHand', (data) => { // a terito lapjai (mindenki latja)
             dummySeat = data.seat;
@@ -236,6 +244,7 @@ const onEntrySubmitted = (e) => {
         });
         sock.on('gameOver', () => {
             pendingPlay = null;
+            hideDiv('auto-butt');
             renderHand();
             renderDummy();
         });

@@ -85,11 +85,13 @@ async function run() {
     });
 
     // Lejatszo botok: mindig az elso szabalyos lapot teszik.
+    let botsPlay = true;
     let cardsPlayed = 0;
     let firstLeadSeat = null;
     socks[0].on('cardPlayed', () => cardsPlayed++);
     socks.forEach(s => {
         s.on('playTurn', (data) => {
+            if (!botsPlay) return;
             if (firstLeadSeat === null) firstLeadSeat = data.actingSeat;
             setTimeout(() => s.emit('playcard', data.legal[0]), 2);
         });
@@ -151,9 +153,19 @@ async function run() {
 
     // A szerver meg el: meg egy osztas
     const redeal2 = waitFor(socks[3], 'deal');
+    bidScript.push('licit', 'passz', 'passz', 'passz'); // a harmadik partit auto fejezi be
+    botsPlay = false;
     socks[0].emit('ujparti');
     const d3 = await redeal2;
     assert(d3.cards.length === 13, 'korpassz utan is indithato uj parti');
+
+    console.log('8. Auto befejezes: a szerver jatssza vegig a partit...');
+    const contract3 = await waitFor(socks[0], 'contract', 10000);
+    const gameOver3P = waitFor(socks[1], 'gameOver', 60000);
+    socks[2].emit('autofinish');
+    const over3 = await gameOver3P;
+    assert(over3.tricks[0] + over3.tricks[1] === 13, 'auto befejezes: mind a 13 utes lement (felvevo: ' +
+        contract3.declarerName + ', eredmeny: ' + over3.tricks[0] + '-' + over3.tricks[1] + ')');
 
     console.log(failed ? '\nVANNAK HIBAK!' : '\nMinden proba sikeres.');
     socks.forEach(s => s.close());
