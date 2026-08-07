@@ -30,14 +30,25 @@ function cardName(card) { // pl. "SA" -> "pikk asz"
 let players = [];      // {sock, name} - a tomb indexe a szek (seat)
 let spectators = [];   // {sock, name}
 
+// Licit nemek emelkedo sorrendben: treff, karo, kor, pikk, szanzadu
+const DENOMS = ['C', 'D', 'H', 'S', 'N'];
+const DENOM_SYMBOLS = { C: '&clubs;', D: '<span style="color:darkred">&diams;</span>', H: '<span style="color:darkred">&hearts;</span>', S: '&spades;', N: 'SZ' };
+
+function bidText(level, denom) { // pl. "2&hearts;"
+    return level + DENOM_SYMBOLS[denom];
+}
+
 // Jatek allapot
 let phase = 'varakozas';   // varakozas | licit | jatek | vege
 let dealer = 0;            // oszto, korbe jar
 let hands = [[], [], [], []];
 let turn = 0;              // kinek a szeke kovetkezik
-let contractSeat = null;   // az utolso licitalo szeke (felvevo)
+let highestBid = null;     // {level, denom, seat} - az eddigi legmagasabb licit
+let firstDenom = {};       // "oldal+nem" -> szek: ki mondta eloszor az adott nemet az oldalon
 let kontraLevel = 0;       // 0: nincs, 1: kontra, 2: rekontra
 let passCount = 0;         // egymas utani passzok szama
+let contract = null;       // {level, denom} - a vegleges szerzodes
+let trump = null;          // adu szin, szanzadunal null
 let declarer = null;
 let dummy = null;          // a felvevo partnere, teritett lapokkal
 let currentTrick = [];     // {seat, card}
@@ -77,14 +88,25 @@ function sendPlist() { // jatekos lista kikuldese, jelolve kinek a kore van
     io.emit('plist', rows.join('<br/>'));
 }
 
+function kontraText() {
+    return kontraLevel === 1 ? ' (kontra)' : (kontraLevel === 2 ? ' (rekontra)' : '');
+}
+
 function broadcastState() { // allapotsor minden kliensnek
     let text = '';
     if (phase === 'varakozas') text = 'Varakozas jatekosokra...';
-    if (phase === 'licit') text = 'Licit - ' + players[turn].name + ' jon';
+    if (phase === 'licit') {
+        text = 'Licit';
+        if (highestBid !== null) {
+            text += ' - allas: ' + bidText(highestBid.level, highestBid.denom) + kontraText() +
+                ' (' + players[highestBid.seat].name + ')';
+        }
+        text += ' - ' + players[turn].name + ' jon';
+    }
     if (phase === 'vege' && declarer === null) text = 'Mindenki passzolt, nincs jatek.';
     if ((phase === 'jatek' || phase === 'vege') && declarer !== null) {
-        let kontraText = kontraLevel === 1 ? ' (kontra)' : (kontraLevel === 2 ? ' (rekontra)' : '');
-        text = 'Felvevo: ' + players[declarer].name + kontraText + ' | Utesek - ' +
+        text = 'Szerzodes: ' + bidText(contract.level, contract.denom) + kontraText() +
+            ' - Felvevo: ' + players[declarer].name + ' | Utesek - ' +
             pairName(0) + ': ' + tricks[0] + ' | ' + pairName(1) + ': ' + tricks[1];
         if (phase === 'jatek') text += ' | ' + players[turn].name + ' jon';
     }
@@ -100,9 +122,13 @@ function legalCards(seat) { // kovesd a szint, ha tudod
 }
 
 function promptBid() {
-    const canKontra = contractSeat !== null && kontraLevel === 0 && (turn % 2) !== (contractSeat % 2);
-    const canRekontra = kontraLevel === 1 && (turn % 2) === (contractSeat % 2);
-    players[turn].sock.emit('bidTurn', { kontra: canKontra, rekontra: canRekontra });
+    const canKontra = highestBid !== null && kontraLevel === 0 && (turn % 2) !== (highestBid.seat % 2);
+    const canRekontra = kontraLevel === 1 && (turn % 2) === (highestBid.seat % 2);
+    players[turn].sock.emit('bidTurn', {
+        highest: highestBid === null ? null : { level: highestBid.level, denom: highestBid.denom },
+        kontra: canKontra,
+        rekontra: canRekontra
+    });
     sendPlist();
     broadcastState();
 }
@@ -121,16 +147,21 @@ function promptPlay() {
 
 function startPlay() {
     phase = 'jatek';
-    declarer = contractSeat;
+    contract = { level: highestBid.level, denom: highestBid.denom };
+    trump = contract.denom === 'N' ? null : contract.denom;
+    // A felvevo az, aki a nyertes oldalon eloszor mondta a szerzodes nemet
+    declarer = firstDenom[(highestBid.seat % 2) + contract.denom];
     dummy = (declarer + 2) % 4;
     turn = (declarer + 1) % 4; // a felvevo utani ellenfel indul
     currentTrick = [];
     tricks = [0, 0];
     trickCount = 0;
-    io.emit('message', '--- ' + players[declarer].name + ' a felvevo' +
-        (kontraLevel === 1 ? ' (kontra)' : (kontraLevel === 2 ? ' (rekontra)' : '')) +
-        ', ' + players[dummy].name + ' teriti a lapjait, ' + players[turn].name + ' indul ---');
+    io.emit('message', '--- Szerzodes: ' + bidText(contract.level, contract.denom) + kontraText() +
+        ', ' + players[declarer].name + ' a felvevo, ' + players[dummy].name +
+        ' teriti a lapjait, ' + players[turn].name + ' indul ---');
     io.emit('contract', {
+        level: contract.level,
+        denom: contract.denom,
         declarerSeat: declarer,
         declarerName: players[declarer].name,
         dummySeat: dummy,
@@ -164,11 +195,20 @@ function stopAuto() {
     }
 }
 
+function beats(card, win) { // eluti-e a card az eddigi nyertes lapot (adu figyelembevetelevel)
+    if (trump !== null) {
+        const cardTrump = card[0] === trump;
+        const winTrump = win[0] === trump;
+        if (cardTrump && !winTrump) return true;
+        if (!cardTrump && winTrump) return false;
+    }
+    return card[0] === win[0] && RANKS.indexOf(card[1]) > RANKS.indexOf(win[1]);
+}
+
 function resolveTrick() {
-    const leadSuit = currentTrick[0].card[0];
     let winner = currentTrick[0];
     currentTrick.forEach(t => {
-        if (t.card[0] === leadSuit && RANKS.indexOf(t.card[1]) > RANKS.indexOf(winner.card[1])) {
+        if (beats(t.card, winner.card)) {
             winner = t;
         }
     });
@@ -186,9 +226,19 @@ function resolveTrick() {
     if (trickCount === 13) {
         phase = 'vege';
         const declSide = declarer % 2;
-        io.emit('message', '=== Vege a partinak! ' + pairName(declSide) + ' (felvevo par): ' +
-            tricks[declSide] + ' utes, ' + pairName(1 - declSide) + ': ' + tricks[1 - declSide] + ' utes ===');
-        io.emit('gameOver', { tricks: tricks, pairNames: [pairName(0), pairName(1)] });
+        const needed = 6 + contract.level;
+        const result = tricks[declSide] >= needed
+            ? 'teljesitette a szerzodest (' + tricks[declSide] + ' utes, kellett: ' + needed + ')'
+            : 'elbukta a szerzodest (' + tricks[declSide] + ' utes, kellett: ' + needed + ')';
+        io.emit('message', '=== Vege a partinak! ' + players[declarer].name + ' ' +
+            bidText(contract.level, contract.denom) + kontraText() + ': ' + result + '. ' +
+            pairName(declSide) + ': ' + tricks[declSide] + ' utes, ' +
+            pairName(1 - declSide) + ': ' + tricks[1 - declSide] + ' utes ===');
+        io.emit('gameOver', {
+            tricks: tricks,
+            pairNames: [pairName(0), pairName(1)],
+            made: tricks[declSide] >= needed
+        });
         sendPlist();
         broadcastState();
     }
@@ -201,7 +251,10 @@ function resolveTrick() {
 function newGame() {
     stopAuto();
     phase = 'licit';
-    contractSeat = null;
+    highestBid = null;
+    firstDenom = {};
+    contract = null;
+    trump = null;
     kontraLevel = 0;
     passCount = 0;
     declarer = null;
@@ -286,40 +339,51 @@ io.on('connection', (sock) => {
     });
 
     //
-    // Licitalas: passz / licit / kontra / rekontra
+    // Licitalas: passz / szintes licit (1C..7N) / kontra / rekontra
     //
-    sock.on('bid', (type) => {
+    sock.on('bid', (b) => {
         if (phase !== 'licit') return;
         const seat = seatOf(sock);
         if (seat !== turn) return;
+        if (!b || typeof b !== 'object') return;
         const name = players[seat].name;
 
-        if (type === 'licit') {
-            contractSeat = seat;
+        if (b.type === 'bid') {
+            const level = b.level;
+            const denom = b.denom;
+            if (!Number.isInteger(level) || level < 1 || level > 7 || !DENOMS.includes(denom)) return;
+            if (highestBid !== null) { // csak magasabb licit mondhato
+                if (level < highestBid.level) return;
+                if (level === highestBid.level && DENOMS.indexOf(denom) <= DENOMS.indexOf(highestBid.denom)) return;
+            }
+            highestBid = { level: level, denom: denom, seat: seat };
+            if (firstDenom[(seat % 2) + denom] === undefined) { // ki mondta eloszor a nemet az oldalon
+                firstDenom[(seat % 2) + denom] = seat;
+            }
             kontraLevel = 0;
             passCount = 0;
-            io.emit('message', name + ': Licit');
+            io.emit('message', name + ': ' + bidText(level, denom));
         }
-        else if (type === 'kontra') {
-            if (contractSeat === null || kontraLevel !== 0 || (seat % 2) === (contractSeat % 2)) return;
+        else if (b.type === 'kontra') {
+            if (highestBid === null || kontraLevel !== 0 || (seat % 2) === (highestBid.seat % 2)) return;
             kontraLevel = 1;
             passCount = 0;
             io.emit('message', name + ': Kontra');
         }
-        else if (type === 'rekontra') {
-            if (kontraLevel !== 1 || (seat % 2) !== (contractSeat % 2)) return;
+        else if (b.type === 'rekontra') {
+            if (kontraLevel !== 1 || (seat % 2) !== (highestBid.seat % 2)) return;
             kontraLevel = 2;
             passCount = 0;
             io.emit('message', name + ': Rekontra');
         }
-        else if (type === 'passz') {
+        else if (b.type === 'passz') {
             passCount++;
             io.emit('message', name + ': Passz');
-            if (contractSeat !== null && passCount === 3) { // egy kor passz a licit utan
+            if (highestBid !== null && passCount === 3) { // harom passz a licit utan
                 startPlay();
                 return;
             }
-            if (contractSeat === null && passCount === 4) { // mindenki passzolt
+            if (highestBid === null && passCount === 4) { // mindenki passzolt
                 phase = 'vege';
                 io.emit('message', 'Mindenki passzolt, nincs jatek. Inditsatok uj partit!');
                 sendPlist();

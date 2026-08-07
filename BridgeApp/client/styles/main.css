@@ -144,10 +144,30 @@ img.dimmed {
     font-size: 12px;
 }
 #bid-buttons {
-    width: 220px;
+    width: 260px;
     text-align: center;
+    display: none;
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 8px;
+    padding: 8px;
 }
-#bid-buttons button {
+#bid-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 46px);
+    gap: 3px;
+    justify-content: center;
+}
+#bid-grid button {
+    padding: 4px 0;
+    font-size: 14px;
+}
+#bid-grid button:disabled {
+    opacity: 0.35;
+}
+#bid-actions {
+    margin-top: 6px;
+}
+#bid-actions button {
     display: none;
     margin: 3px;
     padding: 6px 14px;

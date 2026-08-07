@@ -4,6 +4,9 @@ let userName = null;
 // A kep fajlnev a kod + ".png", pl. "SA.png"
 const SUIT_ORDER = ['S', 'H', 'C', 'D']; // valtott szinek a kirakashoz
 const RANK_ORDER = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
+// Licit nemek emelkedo sorrendben: treff, karo, kor, pikk, szanzadu
+const DENOMS = ['C', 'D', 'H', 'S', 'N'];
+const DENOM_LABELS = { C: '&clubs;', D: '<span style="color:darkred">&diams;</span>', H: '<span style="color:darkred">&hearts;</span>', S: '&spades;', N: 'SZ' };
 
 let mySeat = -1;        // -1: nezelodo
 let myHand = [];
@@ -111,7 +114,26 @@ function playCard(card) {
 }
 
 function hideBidButtons() {
-    ['passz', 'licit', 'kontra', 'rekontra'].forEach(b => hideDiv(b + '-butt'));
+    hideDiv('bid-buttons');
+    ['passz', 'kontra', 'rekontra'].forEach(b => hideDiv(b + '-butt'));
+}
+
+function showBidPanel(data) { // data: {highest, kontra, rekontra}
+    for (let level = 1; level <= 7; level++) {
+        DENOMS.forEach(denom => {
+            const butt = document.getElementById('bid-' + level + '-' + denom);
+            let allowed = true;
+            if (data.highest !== null) { // csak a jelenleginel magasabb licit valaszthato
+                if (level < data.highest.level) allowed = false;
+                if (level === data.highest.level && DENOMS.indexOf(denom) <= DENOMS.indexOf(data.highest.denom)) allowed = false;
+            }
+            butt.disabled = !allowed;
+        });
+    }
+    showDiv('passz-butt', 'inline-block');
+    if (data.kontra) showDiv('kontra-butt', 'inline-block');
+    if (data.rekontra) showDiv('rekontra-butt', 'inline-block');
+    showDiv('bid-buttons');
 }
 
 function resetGameView() {
@@ -164,21 +186,32 @@ const onAuto = (e) => {
     sock.emit('autofinish');
     hideDiv('auto-butt');
 };
-const onBid = (type) => (e) => {
+const onBid = (payload) => (e) => {
     e.preventDefault();
-    sock.emit('bid', type);
+    sock.emit('bid', payload);
     hideBidButtons();
 };
+
+// Licit racs legyartasa: 1C..7N gombok
+const bidGrid = document.getElementById('bid-grid');
+for (let level = 1; level <= 7; level++) {
+    DENOMS.forEach(denom => {
+        const butt = document.createElement('button');
+        butt.id = 'bid-' + level + '-' + denom;
+        butt.innerHTML = level + DENOM_LABELS[denom];
+        butt.addEventListener('click', onBid({ type: 'bid', level: level, denom: denom }));
+        bidGrid.appendChild(butt);
+    });
+}
 
 document.getElementById('start-game').addEventListener('submit', onStartGame);
 document.getElementById('chat-form').addEventListener('submit', onChatSubmitted);
 document.getElementById('ujparti-butt').addEventListener('click', onUjParti);
 document.getElementById('teritek-butt').addEventListener('click', onTerit);
 document.getElementById('auto-butt').addEventListener('click', onAuto);
-document.getElementById('passz-butt').addEventListener('click', onBid('passz'));
-document.getElementById('licit-butt').addEventListener('click', onBid('licit'));
-document.getElementById('kontra-butt').addEventListener('click', onBid('kontra'));
-document.getElementById('rekontra-butt').addEventListener('click', onBid('rekontra'));
+document.getElementById('passz-butt').addEventListener('click', onBid({ type: 'passz' }));
+document.getElementById('kontra-butt').addEventListener('click', onBid({ type: 'kontra' }));
+document.getElementById('rekontra-butt').addEventListener('click', onBid({ type: 'rekontra' }));
 
 const onEntrySubmitted = (e) => {
     e.preventDefault();
@@ -197,7 +230,7 @@ const onEntrySubmitted = (e) => {
             writePlayerList('Belepett jatekosok:<br/>' + text);
         });
         sock.on('state', (text) => {
-            document.getElementById('state').innerText = text;
+            document.getElementById('state').innerHTML = text;
         });
         sock.on('canstart', () => {
             showDiv('start-game');
@@ -212,10 +245,7 @@ const onEntrySubmitted = (e) => {
             if (mySeat >= 0) showDiv('teritek-butt', 'inline-block');
         });
         sock.on('bidTurn', (opts) => { // en jovok a licitben
-            showDiv('passz-butt', 'inline-block');
-            showDiv('licit-butt', 'inline-block');
-            if (opts.kontra) showDiv('kontra-butt', 'inline-block');
-            if (opts.rekontra) showDiv('rekontra-butt', 'inline-block');
+            showBidPanel(opts);
         });
         sock.on('contract', () => {
             hideBidButtons();

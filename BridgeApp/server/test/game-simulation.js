@@ -69,9 +69,20 @@ async function run() {
 
     // Licit botok: a valaszokat addig visszatartjuk, amig a teljes kezekre
     // vonatkozo ellenorzesek le nem futnak.
+    // Terv (oszto: Anna, szek 0): Cili (szek 2) mondja eloszor a kort, Anna emel,
+    // igy a bridzs szabaly szerint Cili lesz a felvevo es Anna terit.
     let releaseBidding;
     const biddingGate = new Promise(res => { releaseBidding = res; });
-    const bidScript = ['licit', 'kontra', 'rekontra', 'passz', 'passz', 'passz'];
+    const bidScript = [
+        { type: 'bid', level: 1, denom: 'C' },  // Anna: 1 treff
+        { type: 'passz' },                      // Bela
+        { type: 'bid', level: 1, denom: 'H' },  // Cili: 1 kor (eloszor a nemet)
+        { type: 'passz' },                      // Denes
+        { type: 'bid', level: 2, denom: 'H' },  // Anna: 2 kor (emeles)
+        { type: 'kontra' },                     // Bela
+        { type: 'rekontra' },                   // Cili
+        { type: 'passz' }, { type: 'passz' }, { type: 'passz' } // Denes, Anna, Bela
+    ];
     let bidIdx = 0;
     const bidLog = [];
     socks.forEach(s => {
@@ -88,7 +99,28 @@ async function run() {
     let botsPlay = true;
     let cardsPlayed = 0;
     let firstLeadSeat = null;
-    socks[0].on('cardPlayed', () => cardsPlayed++);
+
+    // Fuggetlen utes-gyoztes ellenorzes: a teszt maga is kiszamolja adu
+    // figyelembevetelevel, hogy kinek kellett vinnie az utest.
+    const RANKS = '23456789TJQKA';
+    let curTrump = null;
+    let mirrorTrick = [];
+    let winnerMismatches = 0;
+    socks[0].on('contract', c => { curTrump = c.denom === 'N' ? null : c.denom; });
+    socks[0].on('deal', () => { mirrorTrick = []; });
+    socks[0].on('cardPlayed', d => { cardsPlayed++; mirrorTrick.push(d); });
+    socks[0].on('trickDone', d => {
+        let win = mirrorTrick[0];
+        mirrorTrick.forEach(t => {
+            const tTrump = curTrump !== null && t.card[0] === curTrump;
+            const wTrump = curTrump !== null && win.card[0] === curTrump;
+            if (tTrump && !wTrump) win = t;
+            else if (tTrump === wTrump && t.card[0] === win.card[0] &&
+                RANKS.indexOf(t.card[1]) > RANKS.indexOf(win.card[1])) win = t;
+        });
+        if (win.seat !== d.winnerSeat) winnerMismatches++;
+        mirrorTrick = [];
+    });
     socks.forEach(s => {
         s.on('playTurn', (data) => {
             if (!botsPlay) return;
@@ -114,14 +146,19 @@ async function run() {
     const ter = await teritettP;
     assert(ter.name === 'Cili' && ter.cards.length === 13, 'teritett lapok mindenkinek latszanak');
 
-    console.log('4. Licitalas: licit, kontra, rekontra, majd korpassz...');
+    console.log('4. Licitalas: 1C, 1H, 2H, kontra, rekontra, majd harom passz...');
     releaseBidding();
     const contract = await contractP;
-    assert(bidIdx === 6, 'hat licitlepes tortent (' + bidIdx + ')');
-    assert(bidLog[1].opts.kontra === true, 'kontra engedelyezett volt a licit utan az ellenfelnek');
-    assert(bidLog[2].opts.rekontra === true, 'rekontra engedelyezett volt a kontra utan');
+    assert(bidIdx === 10, 'tiz licitlepes tortent (' + bidIdx + ')');
+    assert(bidLog[1].opts.highest && bidLog[1].opts.highest.level === 1 && bidLog[1].opts.highest.denom === 'C',
+        'a soron levo latja az aktualis legmagasabb licitet');
+    assert(bidLog[5].opts.kontra === true, 'kontra engedelyezett volt a licit utan az ellenfelnek');
+    assert(bidLog[5].opts.rekontra === false, 'rekontra nem volt engedelyezett kontra elott');
+    assert(bidLog[6].opts.rekontra === true, 'rekontra engedelyezett volt a kontra utan a felvevo oldalnak');
+    assert(contract.level === 2 && contract.denom === 'H', 'a szerzodes 2 kor');
     assert(contract.kontraLevel === 2, 'a szerzodes rekontrazott');
-    assert((contract.declarerSeat + 2) % 4 === contract.dummySeat, 'az asztal a felvevo partnere');
+    assert(contract.declarerSeat === 2, 'a felvevo Cili, aki eloszor mondta a kort (nem Anna, aki utoljara licitalt)');
+    assert(contract.dummySeat === 0, 'az asztal Anna, a felvevo partnere');
     console.log('  Felvevo: ' + contract.declarerName + ', asztal: ' + contract.dummyName);
 
     const dummyHand = await dummyHandP;
@@ -133,10 +170,11 @@ async function run() {
     assert(cardsPlayed === 52, 'mind az 52 lap kijatszasra kerult (' + cardsPlayed + ')');
     assert(over.tricks[0] + over.tricks[1] === 13, 'osszesen 13 utes: ' +
         over.pairNames[0] + ' ' + over.tricks[0] + ' - ' + over.tricks[1] + ' ' + over.pairNames[1]);
+    assert(winnerMismatches === 0, 'minden utest a szabalyok szerinti gyoztes vitt (adu: kor)');
 
     console.log('6. Uj parti a jatek vege utan...');
     const redeal = waitFor(socks[2], 'deal');
-    bidScript.push('passz', 'passz', 'passz', 'passz'); // a masodik partit mindenki eldobja
+    bidScript.push({ type: 'passz' }, { type: 'passz' }, { type: 'passz' }, { type: 'passz' }); // a masodik partit mindenki eldobja
     socks[1].emit('ujparti');
     const d2 = await redeal;
     assert(d2.cards.length === 13, 'ujraosztas is mukodik');
@@ -153,7 +191,8 @@ async function run() {
 
     // A szerver meg el: meg egy osztas
     const redeal2 = waitFor(socks[3], 'deal');
-    bidScript.push('licit', 'passz', 'passz', 'passz'); // a harmadik partit auto fejezi be
+    // a harmadik parti 3SZ, es auto fejezi be
+    bidScript.push({ type: 'bid', level: 3, denom: 'N' }, { type: 'passz' }, { type: 'passz' }, { type: 'passz' });
     botsPlay = false;
     socks[0].emit('ujparti');
     const d3 = await redeal2;
@@ -165,7 +204,9 @@ async function run() {
     socks[2].emit('autofinish');
     const over3 = await gameOver3P;
     assert(over3.tricks[0] + over3.tricks[1] === 13, 'auto befejezes: mind a 13 utes lement (felvevo: ' +
-        contract3.declarerName + ', eredmeny: ' + over3.tricks[0] + '-' + over3.tricks[1] + ')');
+        contract3.declarerName + ', szerzodes: ' + contract3.level + contract3.denom +
+        ', eredmeny: ' + over3.tricks[0] + '-' + over3.tricks[1] + ')');
+    assert(winnerMismatches === 0, 'szanzaduban is a szabalyok szerinti gyoztes vitt minden utest');
 
     console.log(failed ? '\nVANNAK HIBAK!' : '\nMinden proba sikeres.');
     socks.forEach(s => s.close());
