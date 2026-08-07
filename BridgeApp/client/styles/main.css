@@ -1,0 +1,195 @@
+body {
+    font-family: "Helvetica Neue", sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: darkgreen;
+}
+.board {
+    width: 1250px;
+    height: 760px;
+    border: 1px solid lightgray;
+    margin: 0;
+    padding: 0;
+    display: flex;
+}
+.sidebar {
+    background-color: beige;
+    width: 200px;
+    height: 760px;
+    margin: 0;
+    border: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+#player-list {
+    margin: 5px;
+    min-height: 90px;
+}
+.event-holder {
+    background-color: bisque;
+    width: 200px;
+    margin: 0;
+    border: 0;
+    padding: 0;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+#events {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex-grow: 1;
+    border-bottom: 1px solid lightgray;
+    overflow-y: scroll;
+    font-size: 13px;
+}
+#events li {
+    padding: 2px;
+}
+.button-wrapper {
+    padding: 5px;
+}
+#chat {
+    width: 120px;
+}
+.game-place {
+    width: 1050px;
+    height: 760px;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    background-color: darkgreen;
+}
+.state-bar {
+    background-color: rgb(11, 126, 11);
+    color: white;
+    font-weight: bold;
+    padding: 6px 10px;
+    min-height: 20px;
+}
+.area-label {
+    color: #dddddd;
+    font-size: 13px;
+    padding: 2px 10px;
+}
+#dummy-area {
+    min-height: 120px;
+    border-bottom: 1px solid rgb(11, 126, 11);
+}
+.card-row {
+    display: flex;
+    padding: 2px 10px;
+    min-height: 0;
+}
+.card-row img {
+    height: 100px;
+    margin-right: -16px;
+    border-radius: 4px;
+}
+.card-row img:last-child {
+    margin-right: 0;
+}
+#hand-cards img {
+    height: 130px;
+    margin-right: -20px;
+    transition: transform 0.1s;
+}
+#hand-cards img:last-child {
+    margin-right: 0;
+}
+img.playable {
+    cursor: pointer;
+    box-shadow: 0 0 6px 2px gold;
+}
+img.playable:hover {
+    transform: translateY(-15px);
+}
+img.dimmed {
+    opacity: 0.5;
+}
+#table-area {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.middle-row {
+    display: flex;
+    align-items: center;
+}
+.slot {
+    width: 90px;
+    height: 125px;
+    margin: 4px;
+    border: 1px dashed rgba(255,255,255,0.25);
+    border-radius: 6px;
+    position: relative;
+}
+.slot img {
+    height: 123px;
+    border-radius: 4px;
+}
+.slot .slot-name {
+    position: absolute;
+    top: -18px;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    color: #dddddd;
+    font-size: 12px;
+}
+#bid-buttons {
+    width: 220px;
+    text-align: center;
+}
+#bid-buttons button {
+    display: none;
+    margin: 3px;
+    padding: 6px 14px;
+    font-size: 15px;
+}
+#terito-area {
+    padding: 0 10px;
+}
+.terito-strip {
+    display: flex;
+    align-items: center;
+    margin: 2px 0;
+}
+.terito-strip .terito-name {
+    color: #dddddd;
+    font-size: 13px;
+    width: 160px;
+}
+.terito-strip img {
+    height: 60px;
+    margin-right: -16px;
+    border-radius: 3px;
+}
+#hand-area {
+    min-height: 160px;
+    background-color: rgb(61, 61, 61);
+    padding-bottom: 6px;
+}
+#game-buttons {
+    padding: 4px 10px;
+}
+#game-buttons button {
+    display: none;
+    margin-right: 8px;
+    padding: 4px 12px;
+}
+.entry {
+    background-color: beige;
+    width: 400px;
+    height: 100px;
+    margin: 33px auto;
+    border: 1px solid lightgray;
+    border-radius: 2px;
+    text-align: center;
+}

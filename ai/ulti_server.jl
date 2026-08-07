@@ -1,1 +1,0 @@
-#Websocket tester: http://jsfiddle.net/EAVvQ/24/ or chrome extension: https://chrome.google.com/webstore/detail/simple-websocket-client/

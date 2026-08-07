@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="hu">
+  <head>
+    <meta charset="utf-8">
+    <title>Egyszeru Bridzs</title>
+    <link rel="stylesheet" href="styles/main.css">
+  </head>
+  <body>
+    <div class="entry" id="entry">
+      <p>Ird be a neved a belepeshez (maximum 20 karakter)</p>
+      <form id="entry-form">
+        <input id="name" title="name" autocomplete="off" maxlength="20"><br/>
+        <button id="enter">Belepek</button>
+      </form>
+    </div>
+    <div class="board" id="mainblock">
+      <div class="sidebar">
+        <p id="player-list"></p>
+        <div class="event-holder">
+          <ul id="events"></ul>
+        </div>
+        <div class="button-wrapper">
+          <form id="chat-form">
+            <input id="chat" title="chat" autocomplete="off">
+            <button id="say">Mondok</button>
+          </form>
+          <form id="start-game">
+            <button id="start">Jatek inditasa</button>
+          </form>
+        </div>
+      </div>
+      <div class="game-place">
+        <div id="state" class="state-bar"></div>
+        <div id="dummy-area">
+          <div id="dummy-label" class="area-label"></div>
+          <div id="dummy-cards" class="card-row"></div>
+        </div>
+        <div id="table-area">
+          <div class="slot" id="slot2"></div>
+          <div class="middle-row">
+            <div class="slot" id="slot1"></div>
+            <div id="bid-buttons">
+              <button id="passz-butt">Passz</button>
+              <button id="licit-butt">Licit</button>
+              <button id="kontra-butt">Kontra</button>
+              <button id="rekontra-butt">Rekontra</button>
+            </div>
+            <div class="slot" id="slot3"></div>
+          </div>
+          <div class="slot" id="slot0"></div>
+        </div>
+        <div id="terito-area"></div>
+        <div id="hand-area">
+          <div id="hand-label" class="area-label"></div>
+          <div id="hand-cards" class="card-row"></div>
+          <div id="game-buttons">
+            <button id="ujparti-butt">Uj parti</button>
+            <button id="teritek-butt">Teritek</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="src/client.js"></script>
+  </body>
+</html>
