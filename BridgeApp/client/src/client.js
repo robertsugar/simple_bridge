@@ -216,9 +216,10 @@ function renderInfo() { // bal oldali nagy betus jatekinfo
         return;
     }
     p.innerText = gameNo + '. parti';
-    if (contractInfo) {
-        b.innerHTML = 'Bemondas:<br><b>' + contractInfo.level + DENOM_LABELS[contractInfo.denom] +
-            kontraLabel(contractInfo.kontraLevel) + '</b><br>' + contractInfo.declarerName;
+    if (contractInfo) { // a bemondas ket sorban, nagyon nagy betukkel
+        b.innerHTML = '<div class="big-bid">' + contractInfo.level + DENOM_LABELS[contractInfo.denom] +
+            '<span class="big-kontra">' + kontraLabel(contractInfo.kontraLevel) + '</span></div>' +
+            '<div class="big-name">' + contractInfo.declarerName + '</div>';
     }
     else {
         b.innerHTML = 'Licit folyik...';
@@ -315,6 +316,16 @@ function resetGameView() {
 
 const sock = io();
 
+// Ha a szerver ujraindult (uj verzio), a lap ujratoltodik, hogy friss
+// kliens fusson; a nev megmarad, es a belepes magatol megismetlodik
+sock.on('hello', (boot) => {
+    try {
+        const prev = sessionStorage.getItem('serverBoot');
+        sessionStorage.setItem('serverBoot', boot);
+        if (prev && prev !== boot) location.reload();
+    } catch (e) { }
+});
+
 const writePlayerList = (text) => {
     document.getElementById('player-list').innerHTML = text;
 };
@@ -385,6 +396,7 @@ const onEntrySubmitted = (e) => {
     const input = document.querySelector('#name');
     userName = input.value.substring(0, 20).trim();
     if (userName) {
+        try { sessionStorage.setItem('bridgeName', userName); } catch (e) { }
         hideDiv('entry');
         showDiv('mainblock', 'flex');
         hideDiv('start-game');
@@ -511,3 +523,12 @@ const onEntrySubmitted = (e) => {
 
 hideDiv('mainblock');
 document.querySelector('#entry-form').addEventListener('submit', onEntrySubmitted);
+
+// Ujratoltes (pl. szerverfrissites) utan automatikus visszalepes a mentett nevvel
+try {
+    const savedName = sessionStorage.getItem('bridgeName');
+    if (savedName) {
+        document.querySelector('#name').value = savedName;
+        onEntrySubmitted(new Event('submit'));
+    }
+} catch (e) { }

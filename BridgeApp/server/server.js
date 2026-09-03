@@ -364,8 +364,11 @@ function dropPlayer(sock) {
     broadcastState();
 }
 
+const BOOT = String(Date.now()); // szerver-inditas azonosito: a kliens ebbol veszi eszre a frissitest
+
 io.on('connection', (sock) => {
     console.log('Someone connected');
+    sock.emit('hello', BOOT);
 
     sock.on('name', (text) => {
         const name = String(text).substring(0, 20).trim();
