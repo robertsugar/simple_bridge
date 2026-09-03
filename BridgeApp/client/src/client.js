@@ -87,7 +87,9 @@ function renderFan(abs) {
     }
     else if (abs === dummySeat && playing) { // teritett lapok
         const clickable = pendingPlay && pendingPlay.fromDummy;
-        customSort(dummyCards).forEach(card => {
+        const side = slotOf(abs) === 1 || slotOf(abs) === 3; // oldalt szinenkent kulon sorokban
+        fan.classList.toggle('dummy-vert', side);
+        const makeCard = (card) => {
             const el = cardEl(card);
             if (clickable) {
                 if (pendingPlay.legal.includes(card)) {
@@ -98,8 +100,19 @@ function renderFan(abs) {
                     el.classList.add('dimmed');
                 }
             }
-            fan.appendChild(el);
-        });
+            return el;
+        };
+        if (side) {
+            SUIT_ORDER.forEach(suit => {
+                const row = document.createElement('div');
+                row.className = 'suit-row';
+                customSort(dummyCards.filter(c => c[0] === suit)).forEach(card => row.appendChild(makeCard(card)));
+                if (row.children.length > 0) fan.appendChild(row);
+            });
+        }
+        else {
+            customSort(dummyCards).forEach(card => fan.appendChild(makeCard(card)));
+        }
     }
     else { // hatlapok
         for (let i = 0; i < handCounts[abs]; i++) {

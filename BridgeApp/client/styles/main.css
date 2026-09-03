@@ -78,9 +78,9 @@ body {
     background-color: rgb(11, 100, 11);
     color: white;
     font-weight: bold;
-    font-size: 17px;
-    padding: 8px 14px;
-    min-height: 20px;
+    font-size: 20px;
+    padding: 9px 14px;
+    min-height: 22px;
     margin: 0 -10px 8px -10px;
 }
 .red {
@@ -89,11 +89,11 @@ body {
 
 /* Kartyak BBO stilusban: feher lap, nagy index a bal felso sarokban */
 .card {
-    width: 76px;
-    height: 112px;
+    width: 96px;
+    height: 142px;
     background-color: white;
     border: 1px solid #888888;
-    border-radius: 7px;
+    border-radius: 8px;
     position: relative;
     flex-shrink: 0;
     box-sizing: border-box;
@@ -101,9 +101,9 @@ body {
 .card .idx {
     position: absolute;
     top: 3px;
-    left: 6px;
+    left: 7px;
     font-weight: bold;
-    font-size: 27px;
+    font-size: 38px;
     line-height: 0.95;
     color: black;
 }
@@ -122,12 +122,12 @@ body {
     opacity: 0.45;
 }
 .cardback {
-    width: 34px;
-    height: 92px;
+    width: 42px;
+    height: 118px;
     background-color: #2b7a8c;
     border: 2px solid white;
-    border-radius: 5px;
-    margin-left: -22px;
+    border-radius: 6px;
+    margin-left: -26px;
     flex-shrink: 0;
     box-sizing: border-box;
 }
@@ -152,13 +152,28 @@ body {
 .dummy-fan .card:first-child {
     margin-left: 0;
 }
+.dummy-fan .card .idx {
+    font-size: 31px;
+}
+/* Oldalso terito: szinenkent kulon sor, fuggolegesen atlapolva */
+.dummy-vert {
+    flex-direction: column;
+}
+.dummy-vert .suit-row {
+    display: flex;
+}
+.dummy-vert .suit-row + .suit-row {
+    margin-top: -78px;
+}
+/* Sajat kez: 13 lappal pont a jatekter szeleig er, a lapmeret utana is
+   ugyanez marad, kevesebb lapnal kozepre rendezve */
 .own-fan {
     width: 100%;
+    justify-content: center;
 }
 .own-fan .card {
-    flex: 1 1 0;
-    min-width: 0;
-    width: auto;
+    flex: 0 0 auto;
+    width: calc((100vw - 260px) / 13);
     height: auto;
     aspect-ratio: 27 / 40;
     margin-left: -1px;
@@ -167,19 +182,19 @@ body {
     margin-left: 0;
 }
 .own-fan .card .idx {
-    font-size: clamp(24px, 2.7vw, 46px);
+    font-size: clamp(30px, 3.4vw, 60px);
 }
 .mini-fan .card {
-    width: 54px;
-    height: 78px;
-    margin-left: -32px;
+    width: 64px;
+    height: 94px;
+    margin-left: -36px;
 }
 .mini-fan .card:first-child {
     margin-left: 0;
 }
 .mini-fan .card .idx {
-    font-size: 18px;
-    left: 4px;
+    font-size: 22px;
+    left: 5px;
 }
 
 /* Nevtabla: ulesbetu + nev + utesszam, sarga ha o jon */
@@ -187,28 +202,28 @@ body {
     display: none;
     align-items: stretch;
     margin-top: 2px;
-    min-width: 180px;
-    font-size: 17px;
+    min-width: 210px;
+    font-size: 21px;
     border: 1px solid #444444;
 }
 .plate .badge {
     background-color: #1d4d57;
     color: white;
     font-weight: bold;
-    padding: 3px 8px;
+    padding: 4px 10px;
 }
 .plate .pname {
     background-color: #d7d7d7;
     color: black;
-    padding: 3px 8px;
+    padding: 4px 10px;
     flex-grow: 1;
 }
 .plate .pcount {
     background-color: #d7d7d7;
     color: black;
     font-weight: bold;
-    padding: 3px 8px;
-    min-width: 18px;
+    padding: 4px 10px;
+    min-width: 22px;
     text-align: right;
 }
 .plate.onturn .pname, .plate.onturn .pcount {
@@ -225,7 +240,7 @@ body {
     justify-content: center;
 }
 .seat-side {
-    width: 210px;
+    min-width: 240px;
 }
 .seat-top {
     align-items: center;
@@ -236,8 +251,8 @@ body {
     margin-top: 6px;
 }
 #center-box {
-    width: 430px;
-    height: 310px;
+    width: 540px;
+    height: 390px;
     background-color: #b9cdd2;
     border-radius: 10px;
     position: relative;
@@ -251,58 +266,58 @@ body {
 #bid-history table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 19px;
+    font-size: 24px;
     text-align: center;
 }
 #bid-history th {
     background-color: white;
     font-weight: bold;
-    font-size: 22px;
-    padding: 6px 0;
+    font-size: 28px;
+    padding: 8px 0;
 }
 #bid-history td {
-    padding: 4px 0;
+    padding: 5px 0;
     font-weight: bold;
 }
 .trick-pos {
     position: absolute;
 }
-#trickR0 { bottom: 8px; left: 177px; }
-#trickR1 { left: 14px; top: 99px; }
-#trickR2 { top: 8px; left: 177px; }
-#trickR3 { right: 14px; top: 99px; }
+#trickR0 { bottom: 10px; left: 222px; }
+#trickR1 { left: 18px; top: 124px; }
+#trickR2 { top: 10px; left: 222px; }
+#trickR3 { right: 18px; top: 124px; }
 
 /* Licit panel */
 #bid-buttons {
-    width: 340px;
+    width: 440px;
     text-align: center;
     display: none;
     background-color: rgba(0, 0, 0, 0.35);
     border-radius: 10px;
-    padding: 12px;
+    padding: 14px;
     margin: 8px 0;
 }
 #bid-grid {
     display: grid;
-    grid-template-columns: repeat(5, 60px);
-    gap: 5px;
+    grid-template-columns: repeat(5, 78px);
+    gap: 6px;
     justify-content: center;
 }
 #bid-grid button {
-    padding: 7px 0;
-    font-size: 18px;
+    padding: 9px 0;
+    font-size: 23px;
 }
 #bid-grid button:disabled {
     opacity: 0.35;
 }
 #bid-actions {
-    margin-top: 10px;
+    margin-top: 12px;
 }
 #bid-actions button {
     display: none;
-    margin: 4px;
-    padding: 9px 20px;
-    font-size: 18px;
+    margin: 5px;
+    padding: 11px 26px;
+    font-size: 22px;
 }
 
 /* Teritett lapok (Teritek gomb) */
@@ -328,8 +343,8 @@ body {
 #game-buttons button {
     display: none;
     margin-right: 10px;
-    padding: 7px 16px;
-    font-size: 16px;
+    padding: 9px 20px;
+    font-size: 19px;
 }
 .entry {
     background-color: beige;
