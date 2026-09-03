@@ -199,6 +199,35 @@ function showBidPanel(data) { // data: {highest, kontra, rekontra}
     showDiv('bid-buttons');
 }
 
+function showSeatSetup(names) { // az indito (Eszak) valasztja: partner (Del), majd Kelet
+    const title = document.getElementById('seat-setup-title');
+    const btns = document.getElementById('seat-setup-buttons');
+    let partnerIdx = null;
+    const step2 = () => {
+        title.innerText = 'Ki uljon Keletre?';
+        btns.innerHTML = '';
+        names.forEach((n, i) => {
+            if (i === partnerIdx) return;
+            const b = document.createElement('button');
+            b.innerText = n;
+            b.onclick = () => {
+                sock.emit('seatChoice', { partner: partnerIdx, kelet: i });
+                hideDiv('seat-setup');
+            };
+            btns.appendChild(b);
+        });
+    };
+    title.innerText = 'Te vagy Eszak. Valassz partnert (Del):';
+    btns.innerHTML = '';
+    names.forEach((n, i) => {
+        const b = document.createElement('button');
+        b.innerText = n;
+        b.onclick = () => { partnerIdx = i; step2(); };
+        btns.appendChild(b);
+    });
+    showDiv('seat-setup');
+}
+
 function resetGameView() {
     myHand = [];
     handCounts = [0, 0, 0, 0];
@@ -213,6 +242,7 @@ function resetGameView() {
     clearTrick();
     hideBidButtons();
     hideDiv('auto-butt');
+    hideDiv('seat-setup');
     document.getElementById('terito-area').innerHTML = '';
     renderSeats();
     renderBidHistory();
@@ -302,6 +332,10 @@ const onEntrySubmitted = (e) => {
         });
         sock.on('canstart', () => {
             showDiv('start-game');
+        });
+        sock.on('seatSetup', (data) => { // en inditottam: en valasztom az ulesrendet
+            hideDiv('start-game');
+            showSeatSetup(data.names);
         });
         sock.on('deal', (data) => { // uj parti, osztas
             hideDiv('start-game');

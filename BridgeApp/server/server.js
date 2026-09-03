@@ -55,6 +55,9 @@ let currentTrick = [];     // {seat, card}
 let tricks = [0, 0];       // [0]: 0-2 szekpar utesei, [1]: 1-3 szekpar utesei
 let trickCount = 0;
 let autoTimer = null;      // auto befejezes idozito
+let seatingDone = false;   // volt-e mar ulesrend valasztas
+let seatChooser = null;    // az ulesrendet eppen valaszto jatekos socket-je
+let seatOthers = [];       // a valasztaskor a tobbi harom jatekos (sorrendben)
 
 function shuffle(arr) {
     var ctr = arr.length, temp, index;
@@ -287,6 +290,9 @@ function dropPlayer(sock) {
     if (seat >= 0) {
         const name = players[seat].name;
         players.splice(seat, 1);
+        seatingDone = false; // ha valaki kilep, ujra kell valasztani az ulesrendet
+        seatChooser = null;
+        seatOthers = [];
         if (phase !== 'varakozas') {
             stopAuto();
             phase = 'varakozas';
@@ -339,6 +345,45 @@ io.on('connection', (sock) => {
             sock.emit('message', 'Negy jatekos kell az inditashoz.');
             return;
         }
+        if (!seatingDone) { // elso indites: az indito (Eszak) valasztja az ulesrendet
+            const seat = seatOf(sock);
+            if (seat < 0) {
+                sock.emit('message', 'Az elso partit csak jatekos indithatja.');
+                return;
+            }
+            if (seatChooser !== null) return; // mar folyamatban van a valasztas
+            seatChooser = sock;
+            seatOthers = players.filter(p => p.sock !== sock);
+            sock.emit('seatSetup', { names: seatOthers.map(p => p.name) });
+            io.emit('message', players[seat].name + ' (Eszak) valasztja az ulesrendet...');
+            return;
+        }
+        newGame();
+    });
+
+    //
+    // Ulesrend valasztas: az indito Eszak, o mondja meg ki a partnere (Del)
+    // es ki uljon Keletre; a negyedik jatekos Nyugat lesz
+    //
+    sock.on('seatChoice', (data) => {
+        if (sock !== seatChooser) return;
+        if (!data || typeof data !== 'object') return;
+        const p = data.partner;
+        const k = data.kelet;
+        if (!Number.isInteger(p) || !Number.isInteger(k) || p < 0 || p > 2 || k < 0 || k > 2 || p === k) return;
+        const chooser = players.find(pl => pl.sock === sock);
+        if (!chooser || seatOthers.some(o => !players.includes(o))) { // valaki kozben kilepett
+            seatChooser = null;
+            seatOthers = [];
+            return;
+        }
+        const west = seatOthers.find((o, i) => i !== p && i !== k);
+        players = [chooser, seatOthers[k], seatOthers[p], west];
+        seatingDone = true;
+        seatChooser = null;
+        seatOthers = [];
+        io.emit('message', 'Ulesrend - E: ' + players[0].name + ', K: ' + players[1].name +
+            ', D: ' + players[2].name + ', NY: ' + players[3].name);
         newGame();
     });
 
@@ -457,6 +502,7 @@ server.on('error', (err) => {
     console.error('Server error:', err);
 });
 
-server.listen(8000, () => {
-    console.log('Simple Bridge started on 8000');
+const PORT = process.env.PORT || 8000;
+server.listen(PORT, () => {
+    console.log('Simple Bridge started on ' + PORT);
 });
