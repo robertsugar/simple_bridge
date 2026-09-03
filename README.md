@@ -32,7 +32,10 @@ npm start
 
 Ezutan a jatek a http://localhost:8000 cimen erheto el.
 
-## Kartyakepek
+## Kinezet
 
-A lapok kepei a kozkincs (public domain)
-[playing-cards-assets](https://github.com/hayeah/playing-cards-assets) gyujtemenybol szarmaznak.
+A jatekter a BBO (Bridge Base Online) elrendezeset koveti: sajat kez alul,
+a tobbi jatekos kartyahatlapokkal korben, a terito lapjai felforditva,
+nevtablak ulesbetuvel (E/K/D/NY) es utesszammal (sarga: o jon),
+kozepen az asztalon a licitmenet tablazata, majd a kijatszott lapok.
+A lapokat HTML/CSS rajzolja, nagy, jol olvashato indexekkel.

@@ -1,9 +1,9 @@
 body {
-    font-family: "Helvetica Neue", sans-serif;
+    font-family: "Helvetica Neue", Arial, sans-serif;
     font-size: 16px;
     margin: 0;
     padding: 0;
-    background-color: darkgreen;
+    background-color: #2e6b31;
 }
 .board {
     width: 100%;
@@ -67,99 +67,220 @@ body {
 .game-place {
     flex-grow: 1;
     margin: 0;
-    padding: 0;
+    padding: 0 10px 10px 10px;
     display: flex;
     flex-direction: column;
-    background-color: darkgreen;
+    align-items: center;
+    background-color: #2e6b31;
 }
 .state-bar {
-    background-color: rgb(11, 126, 11);
+    align-self: stretch;
+    background-color: rgb(11, 100, 11);
     color: white;
     font-weight: bold;
-    font-size: 18px;
-    padding: 10px 14px;
-    min-height: 22px;
+    font-size: 17px;
+    padding: 8px 14px;
+    min-height: 20px;
+    margin: 0 -10px 8px -10px;
 }
-.area-label {
-    color: #eeeeee;
-    font-size: 16px;
-    padding: 4px 14px;
+.red {
+    color: #c02020;
 }
-#dummy-area {
-    min-height: 130px;
-    border-bottom: 1px solid rgb(11, 126, 11);
-    padding-bottom: 8px;
-}
-.card-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 7px;
-    padding: 4px 14px;
-    min-height: 0;
-}
-.card-row img {
-    height: 115px;
+
+/* Kartyak BBO stilusban: feher lap, nagy index a bal felso sarokban */
+.card {
+    width: 76px;
+    height: 112px;
     background-color: white;
-    border: 1px solid #555555;
+    border: 1px solid #888888;
     border-radius: 7px;
-    box-shadow: 1px 2px 3px rgba(0, 0, 0, 0.4);
+    position: relative;
+    flex-shrink: 0;
+    box-sizing: border-box;
 }
-#hand-cards img {
-    height: 150px;
-    transition: transform 0.1s;
+.card .idx {
+    position: absolute;
+    top: 3px;
+    left: 6px;
+    font-weight: bold;
+    font-size: 27px;
+    line-height: 0.95;
+    color: black;
 }
-img.playable {
+.card.red .idx {
+    color: #c02020;
+}
+.card.playable {
     cursor: pointer;
     box-shadow: 0 0 8px 3px gold;
+    transition: transform 0.1s;
 }
-img.playable:hover {
-    transform: translateY(-15px);
+.card.playable:hover {
+    transform: translateY(-14px);
 }
-img.dimmed {
-    opacity: 0.5;
+.card.dimmed {
+    opacity: 0.45;
 }
-#table-area {
-    flex-grow: 1;
+.cardback {
+    width: 34px;
+    height: 92px;
+    background-color: #2b7a8c;
+    border: 2px solid white;
+    border-radius: 5px;
+    margin-left: -22px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+.cardback:first-child {
+    margin-left: 0;
+}
+
+/* Ulesek es legyezok */
+.seat {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding: 4px 0;
+    align-items: flex-start;
+    margin: 4px;
 }
+.fan {
+    display: flex;
+    min-height: 0;
+}
+.dummy-fan .card {
+    margin-left: -50px;
+}
+.dummy-fan .card:first-child {
+    margin-left: 0;
+}
+.own-fan {
+    width: 100%;
+}
+.own-fan .card {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    height: auto;
+    aspect-ratio: 27 / 40;
+    margin-left: -1px;
+}
+.own-fan .card:first-child {
+    margin-left: 0;
+}
+.own-fan .card .idx {
+    font-size: clamp(24px, 2.7vw, 46px);
+}
+.mini-fan .card {
+    width: 54px;
+    height: 78px;
+    margin-left: -32px;
+}
+.mini-fan .card:first-child {
+    margin-left: 0;
+}
+.mini-fan .card .idx {
+    font-size: 18px;
+    left: 4px;
+}
+
+/* Nevtabla: ulesbetu + nev + utesszam, sarga ha o jon */
+.plate {
+    display: none;
+    align-items: stretch;
+    margin-top: 2px;
+    min-width: 180px;
+    font-size: 17px;
+    border: 1px solid #444444;
+}
+.plate .badge {
+    background-color: #1d4d57;
+    color: white;
+    font-weight: bold;
+    padding: 3px 8px;
+}
+.plate .pname {
+    background-color: #d7d7d7;
+    color: black;
+    padding: 3px 8px;
+    flex-grow: 1;
+}
+.plate .pcount {
+    background-color: #d7d7d7;
+    color: black;
+    font-weight: bold;
+    padding: 3px 8px;
+    min-width: 18px;
+    text-align: right;
+}
+.plate.onturn .pname, .plate.onturn .pcount {
+    background-color: #f0c33a;
+}
+.seat-bottom .plate {
+    align-self: stretch;
+}
+
+/* Kozepso asztal: licitmenet, majd a kijatszott lapok */
 .middle-row {
     display: flex;
     align-items: center;
+    justify-content: center;
 }
-.slot {
-    width: 100px;
-    height: 140px;
-    margin: 6px;
-    border: 1px dashed rgba(255,255,255,0.3);
-    border-radius: 8px;
+.seat-side {
+    width: 210px;
+}
+.seat-top {
+    align-items: center;
+}
+.seat-bottom {
+    align-self: stretch;
+    align-items: stretch;
+    margin-top: 6px;
+}
+#center-box {
+    width: 430px;
+    height: 310px;
+    background-color: #b9cdd2;
+    border-radius: 10px;
     position: relative;
+    margin: 8px 14px;
+    overflow: hidden;
 }
-.slot img {
-    height: 138px;
-    background-color: white;
-    border-radius: 7px;
+#bid-history {
+    display: none;
+    height: 100%;
 }
-.slot .slot-name {
-    position: absolute;
-    top: -24px;
-    left: 0;
+#bid-history table {
     width: 100%;
+    border-collapse: collapse;
+    font-size: 19px;
     text-align: center;
-    color: #eeeeee;
-    font-size: 15px;
 }
+#bid-history th {
+    background-color: white;
+    font-weight: bold;
+    font-size: 22px;
+    padding: 6px 0;
+}
+#bid-history td {
+    padding: 4px 0;
+    font-weight: bold;
+}
+.trick-pos {
+    position: absolute;
+}
+#trickR0 { bottom: 8px; left: 177px; }
+#trickR1 { left: 14px; top: 99px; }
+#trickR2 { top: 8px; left: 177px; }
+#trickR3 { right: 14px; top: 99px; }
+
+/* Licit panel */
 #bid-buttons {
     width: 340px;
     text-align: center;
     display: none;
-    background-color: rgba(0, 0, 0, 0.3);
+    background-color: rgba(0, 0, 0, 0.35);
     border-radius: 10px;
     padding: 12px;
-    margin: 0 10px;
+    margin: 8px 0;
 }
 #bid-grid {
     display: grid;
@@ -183,34 +304,26 @@ img.dimmed {
     padding: 9px 20px;
     font-size: 18px;
 }
+
+/* Teritett lapok (Teritek gomb) */
 #terito-area {
     padding: 0 14px;
 }
 .terito-strip {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
     margin: 4px 0;
 }
 .terito-strip .terito-name {
     color: #eeeeee;
     font-size: 15px;
-    width: 170px;
+    width: 150px;
 }
-.terito-strip img {
-    height: 75px;
-    background-color: white;
-    border: 1px solid #555555;
-    border-radius: 4px;
-}
-#hand-area {
-    min-height: 175px;
-    background-color: rgb(61, 61, 61);
-    padding-bottom: 10px;
-}
+
 #game-buttons {
-    padding: 8px 14px;
+    align-self: flex-start;
+    padding: 8px 4px;
 }
 #game-buttons button {
     display: none;

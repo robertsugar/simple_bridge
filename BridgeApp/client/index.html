@@ -31,35 +31,44 @@
       </div>
       <div class="game-place">
         <div id="state" class="state-bar"></div>
-        <div id="dummy-area">
-          <div id="dummy-label" class="area-label"></div>
-          <div id="dummy-cards" class="card-row"></div>
+        <div class="seat seat-top">
+          <div class="fan" id="fanR2"></div>
+          <div class="plate" id="plateR2"></div>
         </div>
-        <div id="table-area">
-          <div class="slot" id="slot2"></div>
-          <div class="middle-row">
-            <div class="slot" id="slot1"></div>
-            <div id="bid-buttons">
-              <div id="bid-grid"></div>
-              <div id="bid-actions">
-                <button id="passz-butt">Passz</button>
-                <button id="kontra-butt">Kontra</button>
-                <button id="rekontra-butt">Rekontra</button>
-              </div>
-            </div>
-            <div class="slot" id="slot3"></div>
+        <div class="middle-row">
+          <div class="seat seat-side">
+            <div class="fan" id="fanR1"></div>
+            <div class="plate" id="plateR1"></div>
           </div>
-          <div class="slot" id="slot0"></div>
+          <div id="center-box">
+            <div id="bid-history"></div>
+            <div class="trick-pos" id="trickR0"></div>
+            <div class="trick-pos" id="trickR1"></div>
+            <div class="trick-pos" id="trickR2"></div>
+            <div class="trick-pos" id="trickR3"></div>
+          </div>
+          <div class="seat seat-side">
+            <div class="fan" id="fanR3"></div>
+            <div class="plate" id="plateR3"></div>
+          </div>
+        </div>
+        <div id="bid-buttons">
+          <div id="bid-grid"></div>
+          <div id="bid-actions">
+            <button id="passz-butt">Passz</button>
+            <button id="kontra-butt">Kontra</button>
+            <button id="rekontra-butt">Rekontra</button>
+          </div>
         </div>
         <div id="terito-area"></div>
-        <div id="hand-area">
-          <div id="hand-label" class="area-label"></div>
-          <div id="hand-cards" class="card-row"></div>
-          <div id="game-buttons">
-            <button id="ujparti-butt">Uj parti</button>
-            <button id="teritek-butt">Teritek</button>
-            <button id="auto-butt">Auto befejezes</button>
-          </div>
+        <div class="seat seat-bottom">
+          <div class="fan own-fan" id="fanR0"></div>
+          <div class="plate" id="plateR0"></div>
+        </div>
+        <div id="game-buttons">
+          <button id="ujparti-butt">Uj parti</button>
+          <button id="teritek-butt">Teritek</button>
+          <button id="auto-butt">Auto befejezes</button>
         </div>
       </div>
     </div>

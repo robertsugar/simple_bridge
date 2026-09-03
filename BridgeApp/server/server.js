@@ -129,6 +129,7 @@ function promptBid() {
         kontra: canKontra,
         rekontra: canRekontra
     });
+    io.emit('turn', turn);
     sendPlist();
     broadcastState();
 }
@@ -141,6 +142,7 @@ function promptPlay() {
         fromDummy: acting === dummy,
         legal: legalCards(acting)
     });
+    io.emit('turn', turn);
     sendPlist();
     broadcastState();
 }
@@ -239,6 +241,7 @@ function resolveTrick() {
             pairNames: [pairName(0), pairName(1)],
             made: tricks[declSide] >= needed
         });
+        io.emit('turn', -1);
         sendPlist();
         broadcastState();
     }
@@ -263,11 +266,12 @@ function newGame() {
     tricks = [0, 0];
     trickCount = 0;
     const deck = shuffle(DECK.slice());
+    const names = players.map(p => p.name);
     for (let i = 0; i < 4; i++) {
         hands[i] = deck.slice(i * 13, i * 13 + 13);
-        players[i].sock.emit('deal', { seat: i, cards: hands[i] });
+        players[i].sock.emit('deal', { seat: i, cards: hands[i], dealer: dealer, names: names });
     }
-    spectators.forEach(s => s.sock.emit('deal', { seat: -1, cards: [] }));
+    spectators.forEach(s => s.sock.emit('deal', { seat: -1, cards: [], dealer: dealer, names: names }));
     turn = dealer;
     io.emit('message', '--- Uj parti, ' + players[dealer].name + ' kezdi a licitet ---');
     dealer = (dealer + 1) % 4;
@@ -363,22 +367,26 @@ io.on('connection', (sock) => {
             kontraLevel = 0;
             passCount = 0;
             io.emit('message', name + ': ' + bidText(level, denom));
+            io.emit('bidMade', { seat: seat, text: bidText(level, denom) });
         }
         else if (b.type === 'kontra') {
             if (highestBid === null || kontraLevel !== 0 || (seat % 2) === (highestBid.seat % 2)) return;
             kontraLevel = 1;
             passCount = 0;
             io.emit('message', name + ': Kontra');
+            io.emit('bidMade', { seat: seat, text: 'Kontra' });
         }
         else if (b.type === 'rekontra') {
             if (kontraLevel !== 1 || (seat % 2) !== (highestBid.seat % 2)) return;
             kontraLevel = 2;
             passCount = 0;
             io.emit('message', name + ': Rekontra');
+            io.emit('bidMade', { seat: seat, text: 'Rekontra' });
         }
         else if (b.type === 'passz') {
             passCount++;
             io.emit('message', name + ': Passz');
+            io.emit('bidMade', { seat: seat, text: 'Passz' });
             if (highestBid !== null && passCount === 3) { // harom passz a licit utan
                 startPlay();
                 return;
@@ -386,6 +394,7 @@ io.on('connection', (sock) => {
             if (highestBid === null && passCount === 4) { // mindenki passzolt
                 phase = 'vege';
                 io.emit('message', 'Mindenki passzolt, nincs jatek. Inditsatok uj partit!');
+                io.emit('turn', -1);
                 sendPlist();
                 broadcastState();
                 return;
