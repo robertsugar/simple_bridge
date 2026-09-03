@@ -412,7 +412,8 @@ const onEntrySubmitted = (e) => {
             dealer = data.dealer;
             gameNo = data.gameNo || gameNo + 1;
             contractInfo = null;
-            handCounts = [13, 13, 13, 13];
+            handCounts = data.counts ? data.counts.slice() : [13, 13, 13, 13]; // ujracsatlakozasnal a valos lapszamok
+            tricksPair = data.tricks ? data.tricks.slice() : [0, 0];
             renderSeats();
             renderBidHistory();
             renderInfo();
@@ -500,6 +501,11 @@ const onEntrySubmitted = (e) => {
         });
 
         sock.emit('name', userName);
+        sock.on('connect', () => { // ujracsatlakozas (pl. szerver ujraindult): nev ujrakuldese
+            inGame = false;
+            resetGameView(); // ha van futo jatek, a szerver ujrakuldi az allast
+            sock.emit('name', userName);
+        });
     }
 };
 

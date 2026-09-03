@@ -230,6 +230,19 @@ async function run() {
         ', eredmeny: ' + over3.tricks[0] + '-' + over3.tricks[1] + ')');
     assert(winnerMismatches === 0, 'szanzaduban is a szabalyok szerinti gyoztes vitt minden utest');
 
+    console.log('9. Visszacsatlakozas: Cili kiesik, majd ugyanazzal a nevvel visszater...');
+    socks[2].close();
+    await new Promise(r => setTimeout(r, 300));
+    const cili2 = await connectPlayer('Cili'); // connectPlayer kuldi a nevet
+    const redeal3 = waitFor(cili2, 'deal', 5000);
+    const reover = waitFor(cili2, 'gameOver', 5000);
+    const d4 = await redeal3;
+    assert(d4.seat === 2, 'Cili visszakapta a regi szeket (2)');
+    assert(Array.isArray(d4.counts) && d4.counts.every(c => c === 0), 'a lapszamok szinkronban vannak (parti vege: 0)');
+    const ro = await reover;
+    assert(ro.tricks[0] + ro.tricks[1] === 13, 'a parti eredmenyet is visszakapta');
+    socks[2] = cili2;
+
     console.log(failed ? '\nVANNAK HIBAK!' : '\nMinden proba sikeres.');
     socks.forEach(s => s.close());
     finish();
