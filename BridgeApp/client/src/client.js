@@ -18,6 +18,8 @@ let dealer = 0;
 let handCounts = [0, 0, 0, 0];
 let dummySeat = -1;
 let dummyCards = [];
+let partnerSeat = -1;   // ha en vagyok az asztal: a felvevo szeke
+let partnerCards = [];  // es a felvevo lapjai
 let declarerSeat = -1;
 let turnSeat = -1;
 let playing = false;    // licit kozben false, lejatszas alatt true
@@ -115,6 +117,10 @@ function renderFan(abs) {
         else {
             customSort(dummyCards).forEach(card => fan.appendChild(makeCard(card)));
         }
+    }
+    else if (abs === partnerSeat && playing) { // en vagyok az asztal: latom a felvevo lapjait
+        fan.classList.add('fan-full');
+        customSort(partnerCards).forEach(card => fan.appendChild(cardEl(card)));
     }
     else { // hatlapok
         for (let i = 0; i < handCounts[abs]; i++) {
@@ -296,6 +302,8 @@ function resetGameView() {
     handCounts = [0, 0, 0, 0];
     dummySeat = -1;
     dummyCards = [];
+    partnerSeat = -1;
+    partnerCards = [];
     declarerSeat = -1;
     turnSeat = -1;
     playing = false;
@@ -456,6 +464,11 @@ const onEntrySubmitted = (e) => {
         sock.on('dummyHand', (data) => { // a terito lapjai (mindenki latja)
             dummySeat = data.seat;
             dummyCards = data.cards;
+            renderSeats();
+        });
+        sock.on('partnerHand', (data) => { // en vagyok az asztal: a felvevo lapjai
+            partnerSeat = data.seat;
+            partnerCards = data.cards;
             renderSeats();
         });
         sock.on('playTurn', (data) => { // en jovok (vagy en jatszom az asztal lapjabol)

@@ -68,7 +68,9 @@ async function run() {
     const deals = socks.map(s => waitFor(s, 'deal'));
     const contractP = waitFor(socks[0], 'contract', 10000);
     const dummyHandP = waitFor(socks[0], 'dummyHand', 10000);
+    const partnerHandP = waitFor(socks[0], 'partnerHand', 10000); // az 1. partiban Anna az asztal
     const gameOverP = waitFor(socks[3], 'gameOver', 30000);
+    let dummyRevealAt = -1; // hany kijatszott lap utan terult az asztal
 
     // Licit botok: a valaszokat addig visszatartjuk, amig a teljes kezekre
     // vonatkozo ellenorzesek le nem futnak.
@@ -110,6 +112,7 @@ async function run() {
     let mirrorTrick = [];
     let winnerMismatches = 0;
     socks[0].on('contract', c => { curTrump = c.denom === 'N' ? null : c.denom; });
+    socks[0].once('dummyHand', () => { dummyRevealAt = cardsPlayed; });
     socks[0].on('deal', () => { mirrorTrick = []; });
     socks[0].on('cardPlayed', d => { cardsPlayed++; mirrorTrick.push(d); });
     socks[0].on('trickDone', d => {
@@ -183,6 +186,10 @@ async function run() {
 
     const dummyHand = await dummyHandP;
     assert(dummyHand.cards.length === 13, 'az asztal 13 teritett lapja latszik');
+    assert(dummyRevealAt === 1, 'az asztal pontosan az elso kihivott lap utan terult le (' + dummyRevealAt + ')');
+    const partnerHand = await partnerHandP;
+    assert(partnerHand.seat === 2 && partnerHand.cards.length === 13,
+        'az asztal (Anna) latja a felvevo (Cili) 13 lapjat');
 
     console.log('5. Lejatszas: 13 utes...');
     const over = await gameOverP;

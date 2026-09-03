@@ -179,16 +179,22 @@ function startPlay() {
         dummyName: players[dummy].name,
         kontraLevel: kontraLevel
     });
-    io.emit('dummyHand', { seat: dummy, name: players[dummy].name, cards: hands[dummy] });
-    promptPlay();
+    promptPlay(); // az asztal csak az elso kihivott lap utan terul le
 }
 
 function doPlayCard(acting, card) { // ervenyesitett lap kijatszasa es a jatek leptetese
     hands[acting] = hands[acting].filter(c => c !== card);
     currentTrick.push({ seat: acting, card: card });
     io.emit('cardPlayed', { seat: acting, name: players[acting].name, card: card });
+    if (trickCount === 0 && currentTrick.length === 1) { // az elso kihivas utan terul az asztal
+        io.emit('dummyHand', { seat: dummy, name: players[dummy].name, cards: hands[dummy] });
+        players[dummy].sock.emit('partnerHand', { seat: declarer, cards: hands[declarer] });
+    }
     if (acting === dummy) {
         io.emit('dummyHand', { seat: dummy, name: players[dummy].name, cards: hands[dummy] });
+    }
+    if (acting === declarer) { // az asztal latja a felvevo lapjait
+        players[dummy].sock.emit('partnerHand', { seat: declarer, cards: hands[declarer] });
     }
     if (currentTrick.length === 4) {
         resolveTrick();
@@ -321,7 +327,13 @@ function resync(seat, sock) {
             dummyName: players[dummy].name,
             kontraLevel: kontraLevel
         });
-        sock.emit('dummyHand', { seat: dummy, name: players[dummy].name, cards: hands[dummy] });
+        const revealed = trickCount > 0 || currentTrick.length > 0; // volt-e mar kihivas
+        if (revealed) {
+            sock.emit('dummyHand', { seat: dummy, name: players[dummy].name, cards: hands[dummy] });
+            if (seat === dummy) {
+                sock.emit('partnerHand', { seat: declarer, cards: hands[declarer] });
+            }
+        }
         currentTrick.forEach(t => sock.emit('cardPlayed', { seat: t.seat, name: players[t.seat].name, card: t.card }));
     }
     if (phase === 'licit') promptBid();       // a soron levo ujra megkapja a lehetosegeit
