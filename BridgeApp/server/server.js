@@ -373,12 +373,19 @@ io.on('connection', (sock) => {
     sock.on('name', (text) => {
         const name = String(text).substring(0, 20).trim();
         if (!name) return;
-        if (seatOf(sock) >= 0 || spectators.some(s => s.sock === sock)) return; // mar bent van
-        // Visszacsatlakozas: ha van ilyen nevu, megszakadt jatekos, visszaul a helyere
-        const back = players.findIndex(p => !p.connected && p.name === name);
+        if (seatOf(sock) >= 0) return; // ez a kapcsolat mar jatekos
+        // Visszacsatlakozas: az azonos nevu jatekos atveszi a regi szeket,
+        // akkor is, ha a regi kapcsolat szetesese meg nem ert be a szerverre
+        // (ujratolteskor az uj kapcsolat gyakran megelozi a regi lebontasat)
+        const back = players.findIndex(p => p.name === name);
         if (back >= 0) {
+            spectators = spectators.filter(s => s.sock !== sock); // ha kozben nezelodo lett
+            const old = players[back].sock;
             players[back].sock = sock;
             players[back].connected = true;
+            if (old && old !== sock && old.connected) {
+                old.disconnect(true); // a regi, arva kapcsolat bontasa
+            }
             console.log('Visszatert ' + name + ' ID: ' + sock.id);
             io.emit('message', name + ' visszatert, folytatodik a jatek.');
             resync(back, sock);
@@ -386,6 +393,7 @@ io.on('connection', (sock) => {
             broadcastState();
             return;
         }
+        if (spectators.some(s => s.sock === sock)) return; // mar nezelodo
         if (players.length < 4) {
             players.push({ sock: sock, name: name, connected: true });
             console.log('Belepett ' + name + ' ID: ' + sock.id);

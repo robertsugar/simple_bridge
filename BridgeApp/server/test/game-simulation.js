@@ -243,6 +243,16 @@ async function run() {
     assert(ro.tricks[0] + ro.tricks[1] === 13, 'a parti eredmenyet is visszakapta');
     socks[2] = cili2;
 
+    console.log('10. Szek atvetele: Bela uj kapcsolattal ter vissza, mielott a regi lebomlana...');
+    const oldBela = socks[1];
+    const oldDisconnected = new Promise(res => oldBela.once('disconnect', res));
+    const bela2 = await connectPlayer('Bela'); // a regi kapcsolat meg nyitva van!
+    const redeal4 = await waitFor(bela2, 'deal', 5000);
+    assert(redeal4.seat === 1, 'Bela az uj kapcsolattal is a regi szeket kapta (1), nem lett nezelodo');
+    await oldDisconnected;
+    assert(true, 'a szerver lebontotta a regi, arva kapcsolatot');
+    socks[1] = bela2;
+
     console.log(failed ? '\nVANNAK HIBAK!' : '\nMinden proba sikeres.');
     socks.forEach(s => s.close());
     finish();
