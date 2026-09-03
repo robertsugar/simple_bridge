@@ -67,7 +67,8 @@ function slotOf(seat) { // sajat szek alul (0), tovabbi szekek balra (1), szembe
 function renderFan(abs) {
     const fan = document.getElementById('fanR' + slotOf(abs));
     fan.innerHTML = '';
-    fan.classList.toggle('dummy-fan', inGame && abs === dummySeat && abs !== mySeat);
+    fan.classList.remove('dummy-fan', 'dummy-vert', 'fan-full'); // ne ragadjon be az elozo parti elrendezese
+    if (inGame && abs === dummySeat && abs !== mySeat) fan.classList.add('dummy-fan');
     if (!inGame) return;
     if (abs === mySeat) { // sajat kez, kijatszhato lapok kiemelve
         const clickable = pendingPlay && !pendingPlay.fromDummy && pendingPlay.actingSeat === mySeat;
@@ -89,6 +90,7 @@ function renderFan(abs) {
         const clickable = pendingPlay && pendingPlay.fromDummy;
         const side = slotOf(abs) === 1 || slotOf(abs) === 3; // oldalt szinenkent kulon sorokban
         fan.classList.toggle('dummy-vert', side);
+        fan.classList.toggle('fan-full', !side); // szemben akkora lapokkal, mint a sajat kez
         const makeCard = (card) => {
             const el = cardEl(card);
             if (clickable) {

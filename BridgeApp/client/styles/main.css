@@ -185,21 +185,21 @@ body {
 }
 /* Sajat kez: 13 lappal pont a jatekter szeleig er, a lapmeret utana is
    ugyanez marad, kevesebb lapnal kozepre rendezve */
-.own-fan {
+.own-fan, .fan-full {
     width: 100%;
     justify-content: center;
 }
-.own-fan .card {
+.own-fan .card, .fan-full .card {
     flex: 0 0 auto;
     width: calc((100vw - 260px) / 13);
     height: auto;
     aspect-ratio: 27 / 40;
     margin-left: -1px;
 }
-.own-fan .card:first-child {
+.own-fan .card:first-child, .fan-full .card:first-child {
     margin-left: 0;
 }
-.own-fan .card .idx {
+.own-fan .card .idx, .fan-full .card .idx {
     font-size: clamp(30px, 3.4vw, 60px);
 }
 .mini-fan .card {
@@ -261,6 +261,7 @@ body {
     min-width: 240px;
 }
 .seat-top {
+    align-self: stretch;
     align-items: center;
 }
 .seat-bottom {
