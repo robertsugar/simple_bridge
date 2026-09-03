@@ -1,10 +1,12 @@
 // Negy szimulalt jatekos vegigjatszik egy teljes partit a szerver ellen.
-// Futtatas: npm test (a szervert maga inditja el a 8000-es porton)
+// Futtatas: npm test (a szervert maga inditja el a TEST_PORT/8010-es porton,
+// hogy ne utkozzon egy esetleg futo elo szerverrel)
 const { spawn } = require('child_process');
 const path = require('path');
 const ioc = require('socket.io-client');
 
-const URL = 'http://localhost:8000';
+const PORT = process.env.TEST_PORT || '8010';
+const URL = 'http://localhost:' + PORT;
 const NAMES = ['Anna', 'Bela', 'Cili', 'Denes'];
 
 let failed = false;
@@ -18,9 +20,10 @@ function assert(cond, msg) {
     }
 }
 
-const serverProc = spawn('node', [path.join(__dirname, '..', 'server.js')], { stdio: 'pipe' });
+const serverProc = spawn('node', [path.join(__dirname, '..', 'server.js')],
+    { stdio: 'pipe', env: Object.assign({}, process.env, { PORT: PORT }) });
 serverProc.stdout.on('data', d => {
-    if (d.toString().includes('started on 8000')) run().catch(err => finish(err));
+    if (d.toString().includes('started on ' + PORT)) run().catch(err => finish(err));
 });
 serverProc.on('error', err => finish(err));
 
@@ -129,16 +132,33 @@ async function run() {
         });
     });
 
-    console.log('2. Parti inditasa...');
+    console.log('2. Ulesrend valasztas es parti inditasa...');
+    // Anna nyomja meg a Jatek inditasat: o lesz Eszak, es o valaszt
+    const seatSetupP = waitFor(socks[0], 'seatSetup');
     socks[0].emit('ujparti');
+    const setup = await seatSetupP;
+    assert(setup.names.length === 3 && setup.names.includes('Bela') &&
+        setup.names.includes('Cili') && setup.names.includes('Denes'),
+        'az indito megkapja a masik harom nevet: ' + setup.names.join(', '));
+    // Partner (Del): Cili, Kelet: Bela -> ulesrend: Anna=0/E, Bela=1/K, Cili=2/D, Denes=3/NY
+    socks[0].emit('seatChoice', {
+        partner: setup.names.indexOf('Cili'),
+        kelet: setup.names.indexOf('Bela')
+    });
     const hands = {};
     for (let i = 0; i < 4; i++) {
         const d = await deals[i];
         hands[d.seat] = d.cards;
         assert(d.cards.length === 13, NAMES[i] + ' 13 lapot kapott (szek: ' + d.seat + ')');
+        assert(d.seat === i, NAMES[i] + ' a valasztott szeken ul (' + i + ')');
     }
     const all = Object.values(hands).flat();
     assert(new Set(all).size === 52, 'mind az 52 lap kulonbozo');
+    // Tobb seatSetup mar nem johet: az ulesrend megvan
+    socks.forEach(s => s.on('seatSetup', () => {
+        failed = true;
+        console.error('  FAIL: ujboli seatSetup erkezett, pedig az ulesrend mar megvan');
+    }));
 
     console.log('3. Teritek proba...');
     const teritettP = waitFor(socks[1], 'teritett');

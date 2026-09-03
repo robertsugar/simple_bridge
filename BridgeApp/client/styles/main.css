@@ -87,6 +87,24 @@ body {
     color: #c02020;
 }
 
+/* Ulesrend valaszto panel (az inditonak) */
+#seat-setup {
+    display: none;
+    background-color: rgba(0, 0, 0, 0.35);
+    border-radius: 10px;
+    padding: 16px 24px;
+    margin: 10px 0;
+    text-align: center;
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+}
+#seat-setup-buttons button {
+    font-size: 20px;
+    padding: 10px 24px;
+    margin: 10px 8px 2px 8px;
+}
+
 /* Kartyak BBO stilusban: feher lap, nagy index a bal felso sarokban */
 .card {
     width: 96px;
