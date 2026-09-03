@@ -44,12 +44,12 @@ function showDiv(id, mode) {
     document.getElementById(id).style.display = mode || 'block';
 }
 
-function cardEl(card) { // BBO stilusu lap: feher, nagy index a bal felso sarokban
+function cardEl(card) { // feher lap, a szam es a szin kitolti az egesz lapot
     const el = document.createElement('div');
     el.className = 'card' + (card[0] === 'H' || card[0] === 'D' ? ' red' : '');
     el.dataset.card = card;
-    el.innerHTML = '<div class="idx">' + (RANK_LABELS[card[1]] || card[1]) +
-        '<br>' + SUIT_SYMBOLS[card[0]] + '</div>';
+    el.innerHTML = '<div class="rank">' + (RANK_LABELS[card[1]] || card[1]) + '</div>' +
+        '<div class="suit">' + SUIT_SYMBOLS[card[0]] + '</div>';
     return el;
 }
 
@@ -196,22 +196,69 @@ function hideBidButtons() {
     ['passz', 'kontra', 'rekontra'].forEach(b => hideDiv(b + '-butt'));
 }
 
-function showBidPanel(data) { // data: {highest, kontra, rekontra}
-    for (let level = 1; level <= 7; level++) {
-        DENOMS.forEach(denom => {
-            const butt = document.getElementById('bid-' + level + '-' + denom);
-            let allowed = true;
-            if (data.highest !== null) { // csak a jelenleginel magasabb licit valaszthato
-                if (level < data.highest.level) allowed = false;
-                if (level === data.highest.level && DENOMS.indexOf(denom) <= DENOMS.indexOf(data.highest.denom)) allowed = false;
-            }
-            butt.disabled = !allowed;
-        });
+let bidHighest = null;    // az aktualis legmagasabb licit a panelhez
+let selectedLevel = null; // a kivalasztott szint (szam), utana jon a szin
+let gameNo = 0;           // hanyadik parti
+let contractInfo = null;  // {level, denom, kontraLevel, declarerName}
+
+function kontraLabel(k) {
+    return k === 1 ? ' (kontra)' : (k === 2 ? ' (rekontra)' : '');
+}
+
+function renderInfo() { // bal oldali nagy betus jatekinfo
+    const p = document.getElementById('info-parti');
+    const b = document.getElementById('info-bemondas');
+    const u = document.getElementById('info-utesek');
+    if (!inGame) {
+        p.innerText = '';
+        b.innerHTML = '';
+        u.innerHTML = '';
+        return;
     }
-    showDiv('passz-butt', 'inline-block');
-    if (data.kontra) showDiv('kontra-butt', 'inline-block');
-    if (data.rekontra) showDiv('rekontra-butt', 'inline-block');
-    showDiv('bid-buttons');
+    p.innerText = gameNo + '. parti';
+    if (contractInfo) {
+        b.innerHTML = 'Bemondas:<br><b>' + contractInfo.level + DENOM_LABELS[contractInfo.denom] +
+            kontraLabel(contractInfo.kontraLevel) + '</b><br>' + contractInfo.declarerName;
+    }
+    else {
+        b.innerHTML = 'Licit folyik...';
+    }
+    if (playing) {
+        u.innerHTML = 'Utesek:<br>' +
+            'E-D (' + names[0] + ' &amp; ' + names[2] + '): <b>' + tricksPair[0] + '</b><br>' +
+            'K-NY (' + names[1] + ' &amp; ' + names[3] + '): <b>' + tricksPair[1] + '</b>';
+    }
+    else {
+        u.innerHTML = '';
+    }
+}
+
+function denomAllowed(level, denom) { // magasabb-e ez a licit a jelenleginel
+    if (bidHighest === null) return true;
+    if (level > bidHighest.level) return true;
+    return level === bidHighest.level && DENOMS.indexOf(denom) > DENOMS.indexOf(bidHighest.denom);
+}
+
+function refreshBidPick() {
+    for (let level = 1; level <= 7; level++) {
+        const butt = document.getElementById('bid-lvl-' + level);
+        butt.disabled = !DENOMS.some(d => denomAllowed(level, d));
+        butt.classList.toggle('selected', selectedLevel === level);
+    }
+    DENOMS.forEach(denom => {
+        const butt = document.getElementById('bid-den-' + denom);
+        butt.disabled = selectedLevel === null || !denomAllowed(selectedLevel, denom);
+    });
+}
+
+function showBidPanel(data) { // data: {highest, kontra, rekontra}
+    bidHighest = data.highest;
+    selectedLevel = null;
+    refreshBidPick();
+    showDiv('passz-butt', 'block');
+    if (data.kontra) showDiv('kontra-butt', 'block');
+    if (data.rekontra) showDiv('rekontra-butt', 'block');
+    showDiv('bid-buttons', 'flex');
 }
 
 function showSeatSetup(names) { // az indito (Eszak) valasztja: partner (Del), majd Kelet
@@ -257,30 +304,19 @@ function resetGameView() {
     clearTrick();
     hideBidButtons();
     hideDiv('auto-butt');
+    hideDiv('result-modal');
     hideDiv('seat-setup');
     document.getElementById('terito-area').innerHTML = '';
+    contractInfo = null;
     renderSeats();
     renderBidHistory();
+    renderInfo();
 }
 
 const sock = io();
 
-const writeEvent = (text) => {
-    const parent = document.querySelector('#events');
-    const el = document.createElement('li');
-    el.innerHTML = text;
-    parent.appendChild(el);
-    parent.scrollTop = parent.scrollHeight;
-};
 const writePlayerList = (text) => {
     document.getElementById('player-list').innerHTML = text;
-};
-const onChatSubmitted = (e) => {
-    e.preventDefault();
-    const input = document.querySelector('#chat');
-    const text = input.value;
-    input.value = '';
-    if (text) sock.emit('message', userName + ': ' + text);
 };
 const onStartGame = (e) => {
     e.preventDefault();
@@ -305,21 +341,39 @@ const onBid = (payload) => (e) => {
     hideBidButtons();
 };
 
-// Licit racs legyartasa: 1C..7N gombok
-const bidGrid = document.getElementById('bid-grid');
+// Licit valaszto legyartasa: felul a szintek (1-7), alul a szinek
+const levelRow = document.getElementById('bid-levels');
 for (let level = 1; level <= 7; level++) {
-    DENOMS.forEach(denom => {
-        const butt = document.createElement('button');
-        butt.id = 'bid-' + level + '-' + denom;
-        butt.innerHTML = level + DENOM_LABELS[denom];
-        butt.addEventListener('click', onBid({ type: 'bid', level: level, denom: denom }));
-        bidGrid.appendChild(butt);
+    const butt = document.createElement('button');
+    butt.id = 'bid-lvl-' + level;
+    butt.innerText = level;
+    butt.addEventListener('click', (e) => {
+        e.preventDefault();
+        selectedLevel = level;
+        refreshBidPick();
     });
+    levelRow.appendChild(butt);
 }
+const denomRow = document.getElementById('bid-denoms');
+DENOMS.forEach(denom => {
+    const butt = document.createElement('button');
+    butt.id = 'bid-den-' + denom;
+    butt.innerHTML = DENOM_LABELS[denom];
+    butt.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (selectedLevel === null) return;
+        sock.emit('bid', { type: 'bid', level: selectedLevel, denom: denom });
+        hideBidButtons();
+    });
+    denomRow.appendChild(butt);
+});
 
 document.getElementById('start-game').addEventListener('submit', onStartGame);
-document.getElementById('chat-form').addEventListener('submit', onChatSubmitted);
 document.getElementById('ujparti-butt').addEventListener('click', onUjParti);
+document.getElementById('result-ujparti').addEventListener('click', (e) => {
+    hideDiv('result-modal');
+    onUjParti(e);
+});
 document.getElementById('teritek-butt').addEventListener('click', onTerit);
 document.getElementById('auto-butt').addEventListener('click', onAuto);
 document.getElementById('passz-butt').addEventListener('click', onBid({ type: 'passz' }));
@@ -334,11 +388,7 @@ const onEntrySubmitted = (e) => {
         hideDiv('entry');
         showDiv('mainblock', 'flex');
         hideDiv('start-game');
-        writeEvent('Egyszeru Bridzs beszelgetes');
 
-        sock.on('message', (text) => {
-            writeEvent(text);
-        });
         sock.on('plist', (text) => {
             writePlayerList('Belepett jatekosok:<br/>' + text);
         });
@@ -360,9 +410,12 @@ const onEntrySubmitted = (e) => {
             myHand = data.cards;
             names = data.names;
             dealer = data.dealer;
+            gameNo = data.gameNo || gameNo + 1;
+            contractInfo = null;
             handCounts = [13, 13, 13, 13];
             renderSeats();
             renderBidHistory();
+            renderInfo();
             showDiv('ujparti-butt', 'inline-block');
             if (mySeat >= 0) showDiv('teritek-butt', 'inline-block');
         });
@@ -380,10 +433,12 @@ const onEntrySubmitted = (e) => {
         sock.on('contract', (c) => {
             declarerSeat = c.declarerSeat;
             playing = true;
+            contractInfo = { level: c.level, denom: c.denom, kontraLevel: c.kontraLevel, declarerName: c.declarerName };
             hideBidButtons();
             showDiv('auto-butt', 'inline-block');
             renderSeats();
             renderBidHistory(); // eltunik, jonnek a kijatszott lapok
+            renderInfo();
         });
         sock.on('dummyHand', (data) => { // a terito lapjai (mindenki latja)
             dummySeat = data.seat;
@@ -406,12 +461,23 @@ const onEntrySubmitted = (e) => {
             tricksPair = data.tricks;
             trickFull = true; // a kovetkezo kijatszott lapnal urul az asztal
             renderSeats();
+            renderInfo();
         });
-        sock.on('gameOver', () => {
+        sock.on('gameOver', (data) => {
             pendingPlay = null;
             turnSeat = -1;
             hideDiv('auto-butt');
             renderSeats();
+            if (data.level !== undefined) { // sarga eredmenyablak
+                const kontraTxt = data.kontraLevel === 1 ? ' (kontra)' : (data.kontraLevel === 2 ? ' (rekontra)' : '');
+                const diffTxt = (data.diff >= 0 ? '+' : '') + data.diff;
+                document.getElementById('result-lines').innerHTML =
+                    '<div>Bemondas: <b>' + data.level + DENOM_LABELS[data.denom] + kontraTxt +
+                    '</b> (' + data.declarerName + ')</div>' +
+                    '<div>A felvevok ' + '<b>' + data.declTricks + '</b> utest vittek (kellett: ' + data.needed + ')</div>' +
+                    '<div>Eredmeny: <b>' + diffTxt + '</b></div>';
+                showDiv('result-modal', 'flex');
+            }
         });
         sock.on('teritett', (data) => { // valaki teritette a lapjait
             const area = document.getElementById('terito-area');

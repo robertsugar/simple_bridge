@@ -191,6 +191,8 @@ async function run() {
     assert(over.tricks[0] + over.tricks[1] === 13, 'osszesen 13 utes: ' +
         over.pairNames[0] + ' ' + over.tricks[0] + ' - ' + over.tricks[1] + ' ' + over.pairNames[1]);
     assert(winnerMismatches === 0, 'minden utest a szabalyok szerinti gyoztes vitt (adu: kor)');
+    assert(over.needed === 8 && over.diff === over.declTricks - 8 && over.declTricks === over.tricks[0],
+        'gameOver: bemondas adatok (kellett: ' + over.needed + ', vitt: ' + over.declTricks + ', eredmeny: ' + over.diff + ')');
 
     console.log('6. Uj parti a jatek vege utan...');
     const redeal = waitFor(socks[2], 'deal');

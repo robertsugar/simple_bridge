@@ -16,14 +16,12 @@
     <div class="board" id="mainblock">
       <div class="sidebar">
         <p id="player-list"></p>
-        <div class="event-holder">
-          <ul id="events"></ul>
+        <div id="game-info">
+          <div id="info-parti"></div>
+          <div id="info-bemondas"></div>
+          <div id="info-utesek"></div>
         </div>
         <div class="button-wrapper">
-          <form id="chat-form">
-            <input id="chat" title="chat" autocomplete="off">
-            <button id="say">Mondok</button>
-          </form>
           <form id="start-game">
             <button id="start">Jatek inditasa</button>
           </form>
@@ -57,11 +55,14 @@
           </div>
         </div>
         <div id="bid-buttons">
-          <div id="bid-grid"></div>
           <div id="bid-actions">
             <button id="passz-butt">Passz</button>
             <button id="kontra-butt">Kontra</button>
             <button id="rekontra-butt">Rekontra</button>
+          </div>
+          <div id="bid-pick">
+            <div id="bid-levels"></div>
+            <div id="bid-denoms"></div>
           </div>
         </div>
         <div id="terito-area"></div>
@@ -73,6 +74,13 @@
           <button id="ujparti-butt">Uj parti</button>
           <button id="teritek-butt">Teritek</button>
           <button id="auto-butt">Auto befejezes</button>
+        </div>
+        <div id="result-modal">
+          <div id="result-box">
+            <div id="result-title">Vege a partinak!</div>
+            <div id="result-lines"></div>
+            <button id="result-ujparti">Uj parti</button>
+          </div>
         </div>
       </div>
     </div>

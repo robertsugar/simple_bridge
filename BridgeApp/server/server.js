@@ -55,6 +55,7 @@ let currentTrick = [];     // {seat, card}
 let tricks = [0, 0];       // [0]: 0-2 szekpar utesei, [1]: 1-3 szekpar utesei
 let trickCount = 0;
 let autoTimer = null;      // auto befejezes idozito
+let gameNo = 0;            // hanyadik parti
 let seatingDone = false;   // volt-e mar ulesrend valasztas
 let seatChooser = null;    // az ulesrendet eppen valaszto jatekos socket-je
 let seatOthers = [];       // a valasztaskor a tobbi harom jatekos (sorrendben)
@@ -108,7 +109,7 @@ function broadcastState() { // allapotsor minden kliensnek
     }
     if (phase === 'vege' && declarer === null) text = 'Mindenki passzolt, nincs jatek.';
     if ((phase === 'jatek' || phase === 'vege') && declarer !== null) {
-        text = 'Szerzodes: ' + bidText(contract.level, contract.denom) + kontraText() +
+        text = 'Bemondas: ' + bidText(contract.level, contract.denom) + kontraText() +
             ' - Felvevo: ' + players[declarer].name + ' | Utesek - ' +
             pairName(0) + ': ' + tricks[0] + ' | ' + pairName(1) + ': ' + tricks[1];
         if (phase === 'jatek') text += ' | ' + players[turn].name + ' jon';
@@ -161,7 +162,7 @@ function startPlay() {
     currentTrick = [];
     tricks = [0, 0];
     trickCount = 0;
-    io.emit('message', '--- Szerzodes: ' + bidText(contract.level, contract.denom) + kontraText() +
+    io.emit('message', '--- Bemondas: ' + bidText(contract.level, contract.denom) + kontraText() +
         ', ' + players[declarer].name + ' a felvevo, ' + players[dummy].name +
         ' teriti a lapjait, ' + players[turn].name + ' indul ---');
     io.emit('contract', {
@@ -233,8 +234,8 @@ function resolveTrick() {
         const declSide = declarer % 2;
         const needed = 6 + contract.level;
         const result = tricks[declSide] >= needed
-            ? 'teljesitette a szerzodest (' + tricks[declSide] + ' utes, kellett: ' + needed + ')'
-            : 'elbukta a szerzodest (' + tricks[declSide] + ' utes, kellett: ' + needed + ')';
+            ? 'teljesitette a bemondast (' + tricks[declSide] + ' utes, kellett: ' + needed + ')'
+            : 'elbukta a bemondast (' + tricks[declSide] + ' utes, kellett: ' + needed + ')';
         io.emit('message', '=== Vege a partinak! ' + players[declarer].name + ' ' +
             bidText(contract.level, contract.denom) + kontraText() + ': ' + result + '. ' +
             pairName(declSide) + ': ' + tricks[declSide] + ' utes, ' +
@@ -242,7 +243,14 @@ function resolveTrick() {
         io.emit('gameOver', {
             tricks: tricks,
             pairNames: [pairName(0), pairName(1)],
-            made: tricks[declSide] >= needed
+            made: tricks[declSide] >= needed,
+            level: contract.level,
+            denom: contract.denom,
+            kontraLevel: kontraLevel,
+            declarerName: players[declarer].name,
+            declTricks: tricks[declSide],
+            needed: needed,
+            diff: tricks[declSide] - needed
         });
         io.emit('turn', -1);
         sendPlist();
@@ -268,13 +276,14 @@ function newGame() {
     currentTrick = [];
     tricks = [0, 0];
     trickCount = 0;
+    gameNo++;
     const deck = shuffle(DECK.slice());
     const names = players.map(p => p.name);
     for (let i = 0; i < 4; i++) {
         hands[i] = deck.slice(i * 13, i * 13 + 13);
-        players[i].sock.emit('deal', { seat: i, cards: hands[i], dealer: dealer, names: names });
+        players[i].sock.emit('deal', { seat: i, cards: hands[i], dealer: dealer, names: names, gameNo: gameNo });
     }
-    spectators.forEach(s => s.sock.emit('deal', { seat: -1, cards: [], dealer: dealer, names: names }));
+    spectators.forEach(s => s.sock.emit('deal', { seat: -1, cards: [], dealer: dealer, names: names, gameNo: gameNo }));
     turn = dealer;
     io.emit('message', '--- Uj parti, ' + players[dealer].name + ' kezdi a licitet ---');
     dealer = (dealer + 1) % 4;
