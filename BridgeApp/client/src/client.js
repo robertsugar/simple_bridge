@@ -8,8 +8,8 @@ const RANK_LABELS = { T: '10' };
 // Licit nemek emelkedo sorrendben: treff, karo, kor, pikk, szanzadu
 const DENOMS = ['C', 'D', 'H', 'S', 'N'];
 const DENOM_LABELS = { C: '&clubs;', D: '<span class="red">&diams;</span>', H: '<span class="red">&hearts;</span>', S: '&spades;', N: 'SZ' };
-// Szekek: 0-2 par Eszak-Del, 1-3 par Kelet-Nyugat (a kor iranya E-K-D-NY)
-const SEAT_LETTERS = ['E', 'K', 'D', 'NY'];
+// Szekek: 0-2 par Eszak-Del, 1-3 par Kelet-Nyugat (a kor iranya É-K-D-NY)
+const SEAT_LETTERS = ['É', 'K', 'D', 'NY'];
 
 let mySeat = -1;        // -1: nezelodo
 let myHand = [];
@@ -160,7 +160,9 @@ function renderBidHistory() { // licitmenet tablazat a kozepso asztalon
     }
     el.style.display = 'block';
     let html = '<table><tr>';
-    SEAT_LETTERS.forEach(l => { html += '<th>' + l + '</th>'; });
+    SEAT_LETTERS.forEach((l, i) => { // egtaj + alatta a jatekos neve
+        html += '<th>' + l + '<span class="th-name">' + (names[i] || '') + '</span></th>';
+    });
     html += '</tr>';
     const cells = [];
     for (let i = 0; i < dealer; i++) cells.push(''); // az oszto elotti szekek uresen
@@ -231,8 +233,8 @@ function renderInfo() { // bal oldali nagy betus jatekinfo
         b.innerHTML = 'Licit folyik...';
     }
     if (playing) {
-        u.innerHTML = 'Utesek:<br>' +
-            'E-D (' + names[0] + ' &amp; ' + names[2] + '): <b>' + tricksPair[0] + '</b><br>' +
+        u.innerHTML = 'Ütések:<br>' +
+            'É-D (' + names[0] + ' &amp; ' + names[2] + '): <b>' + tricksPair[0] + '</b><br>' +
             'K-NY (' + names[1] + ' &amp; ' + names[3] + '): <b>' + tricksPair[1] + '</b>';
     }
     else {
@@ -273,7 +275,7 @@ function showSeatSetup(names) { // az indito (Eszak) valasztja: partner (Del), m
     const btns = document.getElementById('seat-setup-buttons');
     let partnerIdx = null;
     const step2 = () => {
-        title.innerText = 'Ki uljon Keletre?';
+        title.innerText = 'Ki üljön Keletre?';
         btns.innerHTML = '';
         names.forEach((n, i) => {
             if (i === partnerIdx) return;
@@ -286,7 +288,7 @@ function showSeatSetup(names) { // az indito (Eszak) valasztja: partner (Del), m
             btns.appendChild(b);
         });
     };
-    title.innerText = 'Te vagy Eszak. Valassz partnert (Del):';
+    title.innerText = 'Te vagy Észak. Válassz partnert (Dél):';
     btns.innerHTML = '';
     names.forEach((n, i) => {
         const b = document.createElement('button');
@@ -341,6 +343,13 @@ const onStartGame = (e) => {
     e.preventDefault();
     sock.emit('ujparti');
 };
+const onChatSubmit = (e) => {
+    e.preventDefault();
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    input.value = '';
+    if (text) sock.emit('chat', text);
+};
 const onUjParti = (e) => {
     e.preventDefault();
     sock.emit('ujparti');
@@ -388,6 +397,7 @@ DENOMS.forEach(denom => {
 });
 
 document.getElementById('start-game').addEventListener('submit', onStartGame);
+document.getElementById('chat-form').addEventListener('submit', onChatSubmit);
 document.getElementById('ujparti-butt').addEventListener('click', onUjParti);
 document.getElementById('result-ujparti').addEventListener('click', (e) => {
     hideDiv('result-modal');
@@ -409,8 +419,19 @@ const onEntrySubmitted = (e) => {
         showDiv('mainblock', 'flex');
         hideDiv('start-game');
 
+        sock.on('chat', (d) => { // jatekosok uzenetei (mindenki latja)
+            const log = document.getElementById('chat-log');
+            const row = document.createElement('div');
+            const b = document.createElement('b');
+            b.textContent = d.name + ': ';
+            row.appendChild(b);
+            row.appendChild(document.createTextNode(d.text));
+            log.appendChild(row);
+            while (log.children.length > 100) log.removeChild(log.firstChild);
+            log.scrollTop = log.scrollHeight;
+        });
         sock.on('plist', (text) => {
-            writePlayerList('Belepett jatekosok:<br/>' + text);
+            writePlayerList('Belépett játékosok:<br/>' + text);
         });
         sock.on('state', (text) => {
             document.getElementById('state').innerHTML = text;
@@ -498,10 +519,10 @@ const onEntrySubmitted = (e) => {
                 const kontraTxt = data.kontraLevel === 1 ? ' (kontra)' : (data.kontraLevel === 2 ? ' (rekontra)' : '');
                 const diffTxt = (data.diff >= 0 ? '+' : '') + data.diff;
                 document.getElementById('result-lines').innerHTML =
-                    '<div>Bemondas: <b>' + data.level + DENOM_LABELS[data.denom] + kontraTxt +
+                    '<div>Bemondás: <b>' + data.level + DENOM_LABELS[data.denom] + kontraTxt +
                     '</b> (' + data.declarerName + ')</div>' +
-                    '<div>A felvevok ' + '<b>' + data.declTricks + '</b> utest vittek (kellett: ' + data.needed + ')</div>' +
-                    '<div>Eredmeny: <b>' + diffTxt + '</b></div>';
+                    '<div>A felvevők ' + '<b>' + data.declTricks + '</b> ütést vittek (kellett: ' + data.needed + ')</div>' +
+                    '<div>Eredmény: <b>' + diffTxt + '</b></div>';
                 showDiv('result-modal', 'flex');
             }
         });

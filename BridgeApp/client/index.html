@@ -2,15 +2,15 @@
 <html lang="hu">
   <head>
     <meta charset="utf-8">
-    <title>Egyszeru Bridzs</title>
+    <title>Egyszerű Bridzs</title>
     <link rel="stylesheet" href="styles/main.css">
   </head>
   <body>
     <div class="entry" id="entry">
-      <p>Ird be a neved a belepeshez (maximum 20 karakter)</p>
+      <p>Írd be a neved a belépéshez (maximum 20 karakter)</p>
       <form id="entry-form">
         <input id="name" title="name" autocomplete="off" maxlength="20"><br/>
-        <button id="enter">Belepek</button>
+        <button id="enter">Belépek</button>
       </form>
     </div>
     <div class="board" id="mainblock">
@@ -23,7 +23,7 @@
         </div>
         <div class="button-wrapper">
           <form id="start-game">
-            <button id="start">Jatek inditasa</button>
+            <button id="start">Játék indítása</button>
           </form>
         </div>
       </div>
@@ -71,15 +71,22 @@
           <div class="plate" id="plateR0"></div>
         </div>
         <div id="game-buttons">
-          <button id="ujparti-butt">Uj parti</button>
-          <button id="teritek-butt">Teritek</button>
-          <button id="auto-butt">Auto befejezes</button>
+          <button id="ujparti-butt">Új parti</button>
+          <button id="teritek-butt">Terítek</button>
+          <button id="auto-butt">Auto befejezés</button>
+        </div>
+        <div id="chat-area">
+          <div id="chat-log"></div>
+          <form id="chat-form">
+            <input id="chat-input" autocomplete="off" maxlength="200" placeholder="Üzenet a játékosoknak...">
+            <button id="chat-send">Küldés</button>
+          </form>
         </div>
         <div id="result-modal">
           <div id="result-box">
-            <div id="result-title">Vege a partinak!</div>
+            <div id="result-title">Vége a partinak!</div>
             <div id="result-lines"></div>
-            <button id="result-ujparti">Uj parti</button>
+            <button id="result-ujparti">Új parti</button>
           </div>
         </div>
       </div>

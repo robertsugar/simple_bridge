@@ -310,7 +310,16 @@ body {
     background-color: white;
     font-weight: bold;
     font-size: 34px;
-    padding: 9px 0;
+    padding: 6px 0 8px 0;
+}
+#bid-history th .th-name {
+    display: block;
+    font-size: 17px;
+    font-weight: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 4px;
 }
 #bid-history td {
     padding: 6px 0;
@@ -402,6 +411,40 @@ body {
     padding: 9px 20px;
     font-size: 19px;
 }
+/* Uzenetek a jatekosok lapja alatt (mindenki latja) */
+#chat-area {
+    align-self: stretch;
+    padding: 4px 4px 10px 4px;
+}
+#chat-log {
+    height: 84px;
+    overflow-y: auto;
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 8px;
+    color: white;
+    font-size: 17px;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+}
+#chat-log div {
+    margin: 2px 0;
+}
+#chat-form {
+    display: flex;
+    gap: 8px;
+}
+#chat-input {
+    flex-grow: 1;
+    font-size: 18px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    border: 1px solid #666666;
+}
+#chat-send {
+    font-size: 18px;
+    padding: 7px 20px;
+}
+
 /* Sarga eredmenyablak a parti vegen */
 #result-modal {
     display: none;

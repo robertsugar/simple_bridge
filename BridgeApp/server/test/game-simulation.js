@@ -135,6 +135,13 @@ async function run() {
         });
     });
 
+    console.log('1b. Uzenetkuldes...');
+    const chatP = waitFor(socks[3], 'chat');
+    socks[0].emit('chat', 'Szia mindenki!');
+    const chatMsg = await chatP;
+    assert(chatMsg.name === 'Anna' && chatMsg.text === 'Szia mindenki!',
+        'az uzenet nevvel egyutt mindenkihez eljut');
+
     console.log('2. Ulesrend valasztas es parti inditasa...');
     // Anna nyomja meg a Jatek inditasat: o lesz Eszak, es o valaszt
     const seatSetupP = waitFor(socks[0], 'seatSetup');
