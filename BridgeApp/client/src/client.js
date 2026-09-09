@@ -28,6 +28,8 @@ let tricksPair = [0, 0];
 let bids = [];          // {seat, text} a licitmenet sorban
 let pendingPlay = null; // {actingSeat, fromDummy, legal} ha en jovok
 let trickFull = false;  // az asztalon teljes utes van, a kovetkezo lapnal torlendo
+let revealHands = null; // parti vegen: mindenki eredeti lapjai
+let trickHist = [];     // parti vegen: az utesek es kik vittek oket
 
 function customSort(arr) { // szinenkent, azon belul csokkeno ertek szerint
     const tmarr = [];
@@ -72,6 +74,23 @@ function renderFan(abs) {
     fan.classList.remove('dummy-fan', 'dummy-vert', 'fan-full'); // ne ragadjon be az elozo parti elrendezese
     if (inGame && abs === dummySeat && abs !== mySeat) fan.classList.add('dummy-fan');
     if (!inGame) return;
+    if (revealHands !== null) { // parti vege: mindenki eredeti lapja felforditva
+        const rel = slotOf(abs);
+        if (rel === 1 || rel === 3) { // oldalt szinenkent kulon sorokban
+            fan.classList.add('dummy-vert');
+            SUIT_ORDER.forEach(suit => {
+                const row = document.createElement('div');
+                row.className = 'suit-row';
+                customSort(revealHands[abs].filter(c => c[0] === suit)).forEach(card => row.appendChild(cardEl(card)));
+                if (row.children.length > 0) fan.appendChild(row);
+            });
+        }
+        else {
+            fan.classList.add('fan-full');
+            customSort(revealHands[abs]).forEach(card => fan.appendChild(cardEl(card)));
+        }
+        return;
+    }
     if (abs === mySeat) { // sajat kez, kijatszhato lapok kiemelve
         const clickable = pendingPlay && !pendingPlay.fromDummy && pendingPlay.actingSeat === mySeat;
         customSort(myHand).forEach(card => {
@@ -173,6 +192,38 @@ function renderBidHistory() { // licitmenet tablazat a kozepso asztalon
             html += '<td>' + (cells[i + j] === undefined ? '' : cells[i + j]) + '</td>';
         }
         html += '</tr>';
+    }
+    html += '</table>';
+    el.innerHTML = html;
+}
+
+function miniCard(card) { // kis szoveges lap az uteslistahoz, pl. "A♠"
+    const red = card[0] === 'H' || card[0] === 'D';
+    return '<span' + (red ? ' class="red"' : '') + '>' +
+        (RANK_LABELS[card[1]] || card[1]) + SUIT_SYMBOLS[card[0]] + '</span>';
+}
+
+function renderTrickHistory() { // parti vegen: melyik utest ki vitte
+    const el = document.getElementById('trick-history');
+    if (revealHands === null) {
+        el.style.display = 'none';
+        return;
+    }
+    el.style.display = 'block';
+    let html = '<table><tr><th>#</th>';
+    SEAT_LETTERS.forEach(l => { html += '<th>' + l + '</th>'; });
+    html += '<th>Vitte</th></tr>';
+    trickHist.forEach((t, i) => {
+        const bySeat = ['', '', '', ''];
+        t.cards.forEach(c => { bySeat[c.seat] = miniCard(c.card); });
+        html += '<tr><td>' + (i + 1) + '.</td>';
+        bySeat.forEach((c, s) => {
+            html += '<td' + (s === t.winnerSeat ? ' class="trick-win"' : '') + '>' + c + '</td>';
+        });
+        html += '<td><b>' + SEAT_LETTERS[t.winnerSeat] + '</b></td></tr>';
+    });
+    if (trickHist.length < 13) {
+        html += '<tr><td colspan="6">A többi ütés bejelentéssel dőlt el.</td></tr>';
     }
     html += '</table>';
     el.innerHTML = html;
@@ -315,12 +366,16 @@ function resetGameView() {
     clearTrick();
     hideBidButtons();
     hideDiv('auto-butt');
+    hideDiv('claim-butt');
     hideDiv('result-modal');
     hideDiv('seat-setup');
-    document.getElementById('terito-area').innerHTML = '';
+    hideDiv('claim-modal');
+    revealHands = null;
+    trickHist = [];
     contractInfo = null;
     renderSeats();
     renderBidHistory();
+    renderTrickHistory();
     renderInfo();
 }
 
@@ -354,9 +409,9 @@ const onUjParti = (e) => {
     e.preventDefault();
     sock.emit('ujparti');
 };
-const onTerit = (e) => {
+const onClaim = (e) => {
     e.preventDefault();
-    sock.emit('teritek');
+    sock.emit('claim');
 };
 const onAuto = (e) => {
     e.preventDefault();
@@ -403,7 +458,21 @@ document.getElementById('result-ujparti').addEventListener('click', (e) => {
     hideDiv('result-modal');
     onUjParti(e);
 });
-document.getElementById('teritek-butt').addEventListener('click', onTerit);
+document.getElementById('claim-butt').addEventListener('click', onClaim);
+document.getElementById('claim-accept').addEventListener('click', (e) => {
+    e.preventDefault();
+    sock.emit('claimAnswer', true);
+    hideDiv('claim-buttons');
+});
+document.getElementById('claim-reject').addEventListener('click', (e) => {
+    e.preventDefault();
+    sock.emit('claimAnswer', false);
+    hideDiv('claim-buttons');
+});
+document.getElementById('result-close').addEventListener('click', (e) => {
+    e.preventDefault();
+    hideDiv('result-modal'); // a lapok es az utesek megtekinthetok mogotte
+});
 document.getElementById('auto-butt').addEventListener('click', onAuto);
 document.getElementById('passz-butt').addEventListener('click', onBid({ type: 'passz' }));
 document.getElementById('kontra-butt').addEventListener('click', onBid({ type: 'kontra' }));
@@ -459,7 +528,6 @@ const onEntrySubmitted = (e) => {
             renderBidHistory();
             renderInfo();
             showDiv('ujparti-butt', 'inline-block');
-            if (mySeat >= 0) showDiv('teritek-butt', 'inline-block');
         });
         sock.on('turn', (t) => {
             turnSeat = t;
@@ -478,6 +546,9 @@ const onEntrySubmitted = (e) => {
             contractInfo = { level: c.level, denom: c.denom, kontraLevel: c.kontraLevel, declarerName: c.declarerName };
             hideBidButtons();
             showDiv('auto-butt', 'inline-block');
+            if (mySeat >= 0 && mySeat !== c.dummySeat) { // az asztal nem jelenthet be
+                showDiv('claim-butt', 'inline-block');
+            }
             renderSeats();
             renderBidHistory(); // eltunik, jonnek a kijatszott lapok
             renderInfo();
@@ -514,6 +585,8 @@ const onEntrySubmitted = (e) => {
             pendingPlay = null;
             turnSeat = -1;
             hideDiv('auto-butt');
+            hideDiv('claim-butt');
+            hideDiv('claim-modal');
             renderSeats();
             if (data.level !== undefined) { // sarga eredmenyablak
                 const kontraTxt = data.kontraLevel === 1 ? ' (kontra)' : (data.kontraLevel === 2 ? ' (rekontra)' : '');
@@ -526,20 +599,34 @@ const onEntrySubmitted = (e) => {
                 showDiv('result-modal', 'flex');
             }
         });
-        sock.on('teritett', (data) => { // valaki teritette a lapjait
-            const area = document.getElementById('terito-area');
-            let strip = document.getElementById('terito-' + data.name);
-            if (!strip) {
-                strip = document.createElement('div');
-                strip.id = 'terito-' + data.name;
-                strip.className = 'terito-strip';
-                area.appendChild(strip);
+        sock.on('claimAsk', (d) => { // valaki bejelentette: minden utest visz
+            document.getElementById('claim-title').innerText = d.claimerName + ' bejelentette: minden ütést visz!';
+            if (d.needed.includes(mySeat)) {
+                document.getElementById('claim-text').innerText = 'Elfogadod?';
+                showDiv('claim-buttons');
             }
-            strip.innerHTML = '<div class="terito-name">' + data.name + ' lapjai:</div>';
-            const fan = document.createElement('div');
-            fan.className = 'fan mini-fan';
-            customSort(data.cards).forEach(card => fan.appendChild(cardEl(card)));
-            strip.appendChild(fan);
+            else {
+                document.getElementById('claim-text').innerText = 'Várakozás az ellenfelek válaszára...';
+                hideDiv('claim-buttons');
+            }
+            showDiv('claim-modal', 'flex');
+        });
+        sock.on('claimResult', (d) => {
+            hideDiv('claim-modal');
+            if (!d.accepted) {
+                const log = document.getElementById('chat-log');
+                const row = document.createElement('div');
+                row.textContent = '— ' + d.name + ' nem fogadta el a bejelentést, folytatódik a játék.';
+                log.appendChild(row);
+                log.scrollTop = log.scrollHeight;
+            }
+        });
+        sock.on('reveal', (d) => { // parti vege: mindenki lapja es az utesek
+            revealHands = d.hands;
+            trickHist = d.tricksHist;
+            clearTrick();
+            renderSeats();
+            renderTrickHistory();
         });
         sock.on('reset', () => { // valaki kilepett, a jatek megszakadt
             inGame = false;

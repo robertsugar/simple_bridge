@@ -176,13 +176,13 @@ body {
     min-height: 0;
 }
 .dummy-fan .card {
-    margin-left: -50px;
+    margin-left: -56px;
 }
 .dummy-fan .card:first-child {
     margin-left: 0;
 }
 /* Atlapolt lapoknal a szam+szin a bal felso sarokban, hogy mindig latszodjon */
-.dummy-vert .card, .mini-fan .card {
+.dummy-vert .card {
     align-items: flex-start;
     justify-content: flex-start;
     padding: 3px 0 0 6px;
@@ -190,9 +190,15 @@ body {
 .dummy-vert .card .rank, .dummy-vert .card .suit {
     font-size: 34px;
 }
-/* Oldalso terito: szinenkent kulon sor, fuggolegesen atlapolva */
+/* Oldalso teritett kez: szinenkent kulon sor, fuggolegesen atlapolva */
 .dummy-vert {
     flex-direction: column;
+}
+.dummy-vert .card {
+    margin-left: -56px;
+}
+.dummy-vert .card:first-child {
+    margin-left: 0;
 }
 .dummy-vert .suit-row {
     display: flex;
@@ -219,17 +225,6 @@ body {
 .own-fan .card .rank, .fan-full .card .rank,
 .own-fan .card .suit, .fan-full .card .suit {
     font-size: clamp(32px, 3.6vw, 64px);
-}
-.mini-fan .card {
-    width: 72px;
-    height: 104px;
-    margin-left: -32px;
-}
-.mini-fan .card:first-child {
-    margin-left: 0;
-}
-.mini-fan .card .rank, .mini-fan .card .suit {
-    font-size: 27px;
 }
 
 /* Nevtabla: ulesbetu + nev + utesszam, sarga ha o jon */
@@ -385,20 +380,70 @@ body {
     opacity: 0.35;
 }
 
-/* Teritett lapok (Teritek gomb) */
-#terito-area {
-    padding: 0 14px;
-}
-.terito-strip {
-    display: flex;
+/* "Minden utest viszek" bejelentes ablaka */
+#claim-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.45);
     align-items: center;
-    gap: 8px;
-    margin: 4px 0;
+    justify-content: center;
+    z-index: 110;
 }
-.terito-strip .terito-name {
-    color: #eeeeee;
-    font-size: 15px;
-    width: 150px;
+#claim-box {
+    background-color: white;
+    border: 3px solid #1d4d57;
+    border-radius: 12px;
+    padding: 24px 40px;
+    text-align: center;
+    font-size: 24px;
+    color: black;
+}
+#claim-title {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+#claim-text {
+    margin-bottom: 14px;
+}
+#claim-buttons button {
+    margin: 4px 8px;
+    padding: 12px 26px;
+    font-size: 21px;
+}
+
+/* Uteslista a parti vegen a kozepso asztalon */
+#trick-history {
+    display: none;
+    height: 100%;
+    overflow-y: auto;
+}
+#trick-history table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 19px;
+    text-align: center;
+}
+#trick-history th {
+    background-color: white;
+    font-size: 20px;
+    padding: 4px 0;
+}
+#trick-history th:first-child, #trick-history td:first-child {
+    width: 44px;
+}
+#trick-history td {
+    padding: 2px 0;
+    font-weight: bold;
+}
+#trick-history td.trick-win {
+    background-color: #f0c33a;
+    border-radius: 4px;
 }
 
 #game-buttons {
@@ -477,8 +522,13 @@ body {
 }
 #result-box button {
     margin-top: 16px;
+    margin-left: 6px;
+    margin-right: 6px;
     padding: 12px 30px;
     font-size: 22px;
+}
+#result-close {
+    font-size: 18px;
 }
 .entry {
     background-color: beige;

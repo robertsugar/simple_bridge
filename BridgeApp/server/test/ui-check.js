@@ -162,13 +162,34 @@ async function clickWhenVisible(page, sel, timeout) {
     await pages[0].screenshot({ path: OUT + '/ui-2-felvevo.png' });
     await pages[1].screenshot({ path: OUT + '/ui-3-ellenfel.png' });
 
-    // Teritek gomb proba
-    await pages[3].click('#teritek-butt');
-    await pages[0].waitForFunction(() => document.querySelectorAll('#terito-area .card').length > 0);
-    assert(true, 'Teritek gomb: a lapok mindenkinel megjelennek');
+    // "Minden utest viszek" bejelentes: Anna (felvevo) bejelenti,
+    // a ket vedo (Bela, Denes) elfogadja -> vege a partinak
+    await pages[0].click('#claim-butt');
+    for (const i of [1, 3]) {
+        await clickWhenVisible(pages[i], '#claim-accept');
+    }
+    await pages[1].waitForFunction(() => {
+        const el = document.getElementById('result-modal');
+        return el && el.style.display === 'flex';
+    });
+    assert(true, 'bejelentes elfogadva: megjelenik az eredmenyablak');
+    // Bezaras utan latszik mindenki lapja es az uteslista
+    await pages[1].click('#result-close');
+    await pages[1].waitForFunction(() =>
+        document.querySelectorAll('#fanR0 .card').length === 13 &&
+        document.querySelectorAll('#fanR2 .card').length === 13);
+    assert(true, 'a parti vegen mindenki eredeti lapja felforditva latszik');
+    const histRows = await pages[1].evaluate(() => ({
+        rows: document.querySelectorAll('#trick-history tr').length,
+        wins: document.querySelectorAll('#trick-history .trick-win').length,
+        note: document.getElementById('trick-history').innerText.includes('bejelentés')
+    }));
+    assert(histRows.rows === 4 && histRows.wins === 2 && histRows.note,
+        'az uteslista mutatja a 2 lejatszott utest es a gyozteseket (' + histRows.rows + ' sor)');
+    await pages[1].screenshot({ path: OUT + '/ui-6-reveal.png' });
 
-    // Uj parti gomb proba
-    await pages[2].click('#ujparti-butt');
+    // Uj parti gomb proba (az eredmenyablakbol)
+    await pages[2].click('#result-ujparti');
     await pages[0].waitForFunction(() => document.querySelectorAll('#fanR0 .card').length === 13
         && document.querySelectorAll('.dummy-fan .card').length === 0);
     assert(true, 'Uj parti gomb: ujraosztas tortent');

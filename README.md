@@ -20,7 +20,11 @@ Az [albapa/ulti](https://github.com/albapa/ulti) projekt forkja.
 - A parti vegen kiderul, hogy a felvevo teljesitette-e a szerzodest
   (6 + szint utes kell hozza).
 - A jatek 13 utesig tart, az utesek szamat a jatek folyamatosan mutatja.
-- Az **Uj parti** es a **Teritek** gombok a jatek kozben is elerhetok.
+- A **Minden utest viszek** gombbal (BBO-szeruen) be lehet jelenteni a
+  hatralevo uteseket; ha mindket ellenfel elfogadja, vege a partinak.
+- A parti vegen mindenki eredeti lapja felfordul, es az uteslista is
+  megjelenik: melyik utest ki vitte.
+- Az **Uj parti** gomb a jatek kozben is elerheto.
 
 ## Inditas
 

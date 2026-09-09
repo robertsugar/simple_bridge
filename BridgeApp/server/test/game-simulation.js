@@ -90,7 +90,7 @@ async function run() {
     ];
     let bidIdx = 0;
     const bidLog = [];
-    socks.forEach(s => {
+    const attachBidBot = (s) => { // az ujracsatlakozo socketekre is fel kell tenni
         s.on('bidTurn', (opts) => {
             const action = bidScript[bidIdx];
             if (action === undefined) return;
@@ -98,7 +98,8 @@ async function run() {
             bidLog.push({ action: action, opts: opts });
             biddingGate.then(() => s.emit('bid', action));
         });
-    });
+    };
+    socks.forEach(attachBidBot);
 
     // Lejatszo botok: mindig az elso szabalyos lapot teszik.
     let botsPlay = true;
@@ -169,12 +170,6 @@ async function run() {
         failed = true;
         console.error('  FAIL: ujboli seatSetup erkezett, pedig az ulesrend mar megvan');
     }));
-
-    console.log('3. Teritek proba...');
-    const teritettP = waitFor(socks[1], 'teritett');
-    socks[2].emit('teritek');
-    const ter = await teritettP;
-    assert(ter.name === 'Cili' && ter.cards.length === 13, 'teritett lapok mindenkinek latszanak');
 
     console.log('4. Licitalas: 1C, 1H, 2H, kontra, rekontra, majd harom passz...');
     releaseBidding();
@@ -256,6 +251,7 @@ async function run() {
     const ro = await reover;
     assert(ro.tricks[0] + ro.tricks[1] === 13, 'a parti eredmenyet is visszakapta');
     socks[2] = cili2;
+    attachBidBot(cili2);
 
     console.log('10. Szek atvetele: Bela uj kapcsolattal ter vissza, mielott a regi lebomlana...');
     const oldBela = socks[1];
@@ -266,6 +262,36 @@ async function run() {
     await oldDisconnected;
     assert(true, 'a szerver lebontotta a regi, arva kapcsolatot');
     socks[1] = bela2;
+    attachBidBot(bela2);
+
+    console.log('11. Bejelentes: minden utest viszek...');
+    // Uj parti (oszto: Denes), Denes 1 kort mond es o lesz a felvevo
+    bidScript.push({ type: 'bid', level: 1, denom: 'H' }, { type: 'passz' }, { type: 'passz' }, { type: 'passz' });
+    const deal5 = waitFor(socks[0], 'deal');
+    const contract5P = waitFor(socks[3], 'contract', 10000);
+    // Az ellenfelek (Anna es Cili) elfogadjak a bejelentest
+    [socks[0], socks[2]].forEach(s => s.once('claimAsk', () => s.emit('claimAnswer', true)));
+    socks[0].emit('ujparti');
+    await deal5;
+    const contract5 = await contract5P;
+    assert(contract5.declarerSeat === 3 && contract5.dummySeat === 1, 'Denes a felvevo, Bela az asztal');
+    // a varakozok csak most, hogy a resync-bol erkezo regi gameOver-t ne kapjak el
+    const claimAskP = waitFor(socks[1], 'claimAsk', 10000);
+    const gameOver5P = waitFor(socks[1], 'gameOver', 10000);
+    const revealP = waitFor(socks[2], 'reveal', 10000);
+    socks[3].emit('claim'); // a felvevo bejelenti
+    const ask = await claimAskP;
+    assert(ask.claimerName === 'Denes' && ask.needed.length === 2 &&
+        ask.needed.includes(0) && ask.needed.includes(2),
+        'mindket ellenfelnek (Anna, Cili) el kell fogadnia');
+    const over5 = await gameOver5P;
+    assert(over5.tricks[1] === 13 && over5.tricks[0] === 0 && over5.made === true,
+        'elfogadva: a bejelento vonala vitte mind a 13 utest (' + over5.tricks + ')');
+    const rev = await revealP;
+    assert(rev.hands.length === 4 && rev.hands.every(h => h.length === 13),
+        'a parti vegen mindenki eredeti 13 lapja lathato');
+    assert(Array.isArray(rev.tricksHist) && rev.tricksHist.length === 0,
+        'az uteslista is megjott (' + rev.tricksHist.length + ' lejatszott utes)');
 
     console.log(failed ? '\nVANNAK HIBAK!' : '\nMinden proba sikeres.');
     socks.forEach(s => s.close());
