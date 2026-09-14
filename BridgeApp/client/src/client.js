@@ -41,13 +41,14 @@ let trickClearTimer = null;
 let trickZ = 1;
 let leftSeat = -1;   // az eppen kiesett jatekos szeke
 
-function suitOrderH() { // vizszintes sorban: az adu jobb oldalra
-    if (!trumpSuit || !playing) return SUIT_ORDER;
-    return SUIT_ORDER.filter(x => x !== trumpSuit).concat([trumpSuit]);
-}
-function suitOrderV() { // fuggoleges szinsoroknal: az adu felulre
+// Lapok sorrendje balrol jobbra (ill. fentrol le): adu (ha van),
+// pikk, kor, treff, karo
+function suitOrderH() {
     if (!trumpSuit || !playing) return SUIT_ORDER;
     return [trumpSuit].concat(SUIT_ORDER.filter(x => x !== trumpSuit));
+}
+function suitOrderV() {
+    return suitOrderH();
 }
 function customSort(arr, order) { // szinenkent, azon belul csokkeno ertek szerint
     const tmarr = [];
@@ -542,6 +543,20 @@ document.getElementById('confirm-no').addEventListener('click', (e) => {
     e.preventDefault();
     hideDiv('confirm-modal');
 });
+document.getElementById('leave-butt').addEventListener('click', (e) => {
+    e.preventDefault();
+    showDiv('leave-modal', 'flex');
+});
+document.getElementById('leave-yes').addEventListener('click', (e) => {
+    e.preventDefault();
+    sock.emit('leave');
+    try { sessionStorage.removeItem('bridgeName'); } catch (err) { }
+    setTimeout(() => location.reload(), 200); // vissza a belepo kepernyore
+});
+document.getElementById('leave-no').addEventListener('click', (e) => {
+    e.preventDefault();
+    hideDiv('leave-modal');
+});
 document.getElementById('left-wait').addEventListener('click', (e) => {
     e.preventDefault();
     hideDiv('left-modal');
@@ -613,9 +628,10 @@ const onEntrySubmitted = (e) => {
             undoActor = d.actor;
             renderUndo();
         });
-        sock.on('playerLeft', (d) => { // jatekos esett ki a parti kozben
+        sock.on('playerLeft', (d) => { // jatekos esett ki vagy lepett ki a parti kozben
             leftSeat = d.seat;
-            document.getElementById('left-title').innerText = d.name + ' kapcsolata megszakadt.';
+            document.getElementById('left-title').innerText =
+                d.name + (d.left ? ' kilépett a játékból.' : ' kapcsolata megszakadt.');
             showDiv('left-modal', 'flex');
         });
         sock.on('deal', (data) => { // uj parti, osztas

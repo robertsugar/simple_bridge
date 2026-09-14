@@ -519,6 +519,26 @@ io.on('connection', (sock) => {
         broadcastState();
     });
 
+    sock.on('leave', () => { // kilepes: felall es eltunik a jatekosok kozul
+        const seat = seatOf(sock);
+        if (seat >= 0) {
+            const name = players[seat].name;
+            players[seat] = null;
+            io.emit('message', name + ' kilépett a játékból.');
+            if (phase === 'licit' || phase === 'jatek') {
+                io.emit('playerLeft', { seat: seat, name: name, left: true });
+            }
+        }
+        else {
+            const spec = spectators.find(x => x.sock === sock);
+            spectators = spectators.filter(x => x.sock !== sock);
+            if (spec) io.emit('message', spec.name + ' kilépett.');
+        }
+        sendSeats();
+        sendPlist();
+        broadcastState();
+    });
+
     sock.on('kick', (s) => {
         if (!Number.isInteger(s) || s < 0 || s > 3) return;
         if (seatOf(sock) < 0) return; // csak ulo jatekos dobhat ki
