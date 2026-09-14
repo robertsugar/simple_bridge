@@ -62,20 +62,13 @@ async function clickWhenVisible(page, sel, timeout) {
         document.getElementById('chat-log').innerText.includes('Bela: Szia, kezdjuk!'));
     assert(true, 'a lapok alatti uzenet mindenkinel megjelenik');
 
-    // Jatek inditasa + ulesrend: Anna (Eszak) partnere Cili (Del), Kelet Bela
-    await clickWhenVisible(pages[0], '#start');
-    const clickSeatButton = async (name) => {
-        await pages[0].waitForFunction((n) =>
-            Array.from(document.querySelectorAll('#seat-setup-buttons button'))
-                .some(b => b.innerText === n && b.offsetParent !== null), {}, name);
-        await pages[0].evaluate((n) => {
-            Array.from(document.querySelectorAll('#seat-setup-buttons button'))
-                .find(b => b.innerText === n).click();
-        }, name);
-    };
-    await clickSeatButton('Cili');
-    await clickSeatButton('Bela');
-    console.log('2. Parti elinditva, ulesrend kivalasztva');
+    // Mindenki leul a sajat helyere (Anna:É, Bela:K, Cili:D, Denes:NY),
+    // majd Anna a kozepen megjeleno gombbal indit
+    for (let i = 0; i < 4; i++) {
+        await clickWhenVisible(pages[i], '#sit-' + i);
+    }
+    await clickWhenVisible(pages[0], '#start-center');
+    console.log('2. Mindenki leult, parti elinditva kozeprol');
 
     for (let i = 0; i < 4; i++) {
         await pages[i].waitForFunction(() => document.querySelectorAll('#fanR0 .card').length === 13);
@@ -138,8 +131,11 @@ async function clickWhenVisible(page, sel, timeout) {
     });
     assert(sizes.d === sizes.o, 'a felso terito lapmerete egyezik a sajattal (' + sizes.d + '=' + sizes.o + ')');
 
-    const stateText = await pages[1].$eval('#state', el => el.innerText);
-    assert(stateText.includes('Felvevő: Anna'), 'allapotsor mutatja a felvevot ekezettel: "' + stateText + '"');
+    const sideInfo = await pages[1].evaluate(() =>
+        document.getElementById('info-turn').innerText + ' | ' +
+        (document.querySelector('#info-bemondas .big-name') || {}).innerText);
+    assert(sideInfo.includes('Jön:') && sideInfo.includes('Anna'),
+        'bal oldali info: felvevo es ki jon (' + sideInfo + ')');
     const plates = await pages[2].evaluate(() =>
         Array.from(document.querySelectorAll('.plate .badge')).map(b => b.innerText).join(','));
     assert(plates.split(',').length === 4, 'negy nevtabla latszik (' + plates + ')');
@@ -149,14 +145,20 @@ async function clickWhenVisible(page, sel, timeout) {
     assert(infoText.includes('1♥') && infoText.includes('É-D') && infoText.includes('K-NY'),
         'jatekinfo panel: nagy bemondas es vonalankenti utesek latszanak (' + infoText.split('/')[0].trim() + ')');
 
+    // Jatek kozben a licitmenet a bal oldalon is latszik
+    const sideBids = await pages[3].evaluate(() => document.getElementById('info-licit').innerText);
+    assert(sideBids.includes('Licitmenet') && sideBids.includes('1'),
+        'a licitmenet jatek kozben a bal oldalon lathato');
     // Meg 7 lap: osszesen ket teljes utes
     for (let c = 0; c < 7; c++) {
         await playOne();
         await new Promise(r => setTimeout(r, 200));
     }
     await new Promise(r => setTimeout(r, 400));
-    const state2 = await pages[2].$eval('#state', el => el.innerText);
-    assert(/Ütések/.test(state2) && !/: 0 \|.*: 0/.test(state2), 'utes szamlalo valtozott: "' + state2 + '"');
+    const state2 = await pages[2].evaluate(() => document.getElementById('info-utesek').innerText);
+    const nums = (state2.match(/\d+/g) || []).map(Number);
+    assert(/Ütések/.test(state2) && nums.reduce((a, b) => a + b, 0) === 2,
+        'utes szamlalo valtozott a bal oldalon: "' + state2.replace(/\n/g, ' ') + '"');
     const backs2 = await pages[1].evaluate(() => document.querySelectorAll('.cardback').length);
     assert(backs2 < 39, 'a hatlapok szama csokkent a kijatszas utan (' + backs2 + ')');
     await pages[0].screenshot({ path: OUT + '/ui-2-felvevo.png' });

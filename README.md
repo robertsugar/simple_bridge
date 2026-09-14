@@ -5,7 +5,10 @@ Az [albapa/ulti](https://github.com/albapa/ulti) projekt forkja.
 
 ## Jatekmenet (MVP)
 
-- Negy jatekos lep be a nevevel (maximum 20 karakter), a tovabbi belepok nezelodok.
+- A belepok (nev max. 20 karakter) nezelodokent indulnak, es maguk ulnek
+  le egy ures helyre (É/K/D/NY); fel is allhatnak, a megszakadt jatekos
+  helye felszabadithato, es oda uj jatekos ulhet - akar parti kozben is.
+- A Jatek inditasa gomb kozepen jelenik meg, ha negy jatekos ul.
 - Mindenki 13 lapot kap egy szabvany 52 lapos francia kartyabol.
 - Teljes licitales: **1&clubs; .. 7SZ** (treff, karo, kor, pikk, szanzadu),
   **Passz**, **Kontra**, **Rekontra**. Minden licitnek magasabbnak kell lennie
@@ -24,7 +27,9 @@ Az [albapa/ulti](https://github.com/albapa/ulti) projekt forkja.
   hatralevo uteseket; ha mindket ellenfel elfogadja, vege a partinak.
 - A parti vegen mindenki eredeti lapja felfordul, es az uteslista is
   megjelenik: melyik utest ki vitte.
-- Az **Uj parti** gomb a jatek kozben is elerheto.
+- Az **Uj parti** gomb a jatek kozben is elerheto (megerosites utan);
+  a **Visszavonas** gombbal az utolso licit vagy lapkijatszas vonhato
+  vissza, akar tobb lepes is egymas utan.
 
 ## Inditas
 

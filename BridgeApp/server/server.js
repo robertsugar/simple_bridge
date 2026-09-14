@@ -26,9 +26,10 @@ function cardName(card) { // pl. "SA" -> "pikk asz"
     return SUIT_NAMES[card[0]] + ' ' + r;
 }
 
-// Jatekosok: az elso negy belepo kap helyet (0-3), a tobbiek nezelodok
-let players = [];      // {sock, name} - a tomb indexe a szek (seat)
-let spectators = [];   // {sock, name}
+// Negy fix ules (0:É 1:K 2:D 3:NY); a belepok nezelodokent indulnak,
+// es maguk ulnek le egy ures helyre
+let players = [null, null, null, null]; // {sock, name, connected} vagy null
+let spectators = [];   // {sock, name} - a nem ulo belepok
 
 // Licit nemek emelkedo sorrendben: treff, karo, kor, pikk, szanzadu
 const DENOMS = ['C', 'D', 'H', 'S', 'N'];
@@ -64,9 +65,7 @@ let initialHands = [];     // a kiosztott kezek (parti vegi felfedeshez)
 let trickHistory = [];     // {cards: [{seat, card}...], winnerSeat} minden uteshez
 let lastReveal = null;     // a parti vegi felfedes (ujracsatlakozashoz)
 let claimPending = null;   // {seat, needed: [szekek], accepted: [szekek]}
-let seatingDone = false;   // volt-e mar ulesrend valasztas
-let seatChooser = null;    // az ulesrendet eppen valaszto jatekos socket-je
-let seatOthers = [];       // a valasztaskor a tobbi harom jatekos (sorrendben)
+let history = [];          // visszavonashoz: {snap, actor} minden akcio elott
 
 function shuffle(arr) {
     var ctr = arr.length, temp, index;
@@ -86,16 +85,28 @@ function pairName(side) { // 0: 0-2 szekpar, 1: 1-3 szekpar
     return a + ' & ' + b;
 }
 
+const SEAT_NAMES = ['É', 'K', 'D', 'NY'];
+
+function seatsFull() {
+    return players.every(p => p !== null);
+}
+
+function sendSeats() { // ulesek allapota minden kliensnek
+    io.emit('seats', players.map(p => p === null ? null : { name: p.name, connected: p.connected }));
+}
+
 function sendPlist() { // jatekos lista kikuldese, jelolve kinek a kore van
-    const rows = players.map((p, i) => {
-        let n = p.name;
+    const rows = [];
+    players.forEach((p, i) => {
+        if (p === null) return;
+        let n = SEAT_NAMES[i] + ': ' + p.name;
         if (!p.connected) n = n + ' (megszakadt)';
         if (phase === 'jatek' || phase === 'vege') {
             if (i === declarer) n = '<span style="color:darkred;font-weight:bold">' + n + ' (felvevő)</span>';
             if (i === dummy) n = '<span style="color:darkgreen;font-weight:bold">' + n + ' (asztal)</span>';
         }
         if ((phase === 'licit' || phase === 'jatek') && i === turn) n = '&gt; ' + n;
-        return n;
+        rows.push(n);
     });
     spectators.forEach(s => rows.push(s.name + ' (nézelődő)'));
     io.emit('plist', rows.join('<br/>'));
@@ -143,6 +154,7 @@ function promptBid() {
         rekontra: canRekontra
     });
     io.emit('turn', turn);
+    sendUndoState();
     sendPlist();
     broadcastState();
 }
@@ -156,6 +168,7 @@ function promptPlay() {
         legal: legalCards(acting)
     });
     io.emit('turn', turn);
+    sendUndoState();
     sendPlist();
     broadcastState();
 }
@@ -187,6 +200,7 @@ function startPlay() {
 }
 
 function doPlayCard(acting, card) { // ervenyesitett lap kijatszasa es a jatek leptetese
+    pushHistory(acting === dummy ? declarer : acting); // a visszavonashoz
     hands[acting] = hands[acting].filter(c => c !== card);
     currentTrick.push({ seat: acting, card: card });
     io.emit('cardPlayed', { seat: acting, name: players[acting].name, card: card });
@@ -226,6 +240,31 @@ function beats(card, win) { // eluti-e a card az eddigi nyertes lapot (adu figye
     return card[0] === win[0] && RANKS.indexOf(card[1]) > RANKS.indexOf(win[1]);
 }
 
+// Visszavonas: minden akcio (licit vagy lapkijatszas) elott pillanatkep
+function pushHistory(actor) {
+    history.push({
+        actor: actor,
+        snap: JSON.parse(JSON.stringify({
+            phase: phase, turn: turn, highestBid: highestBid, firstDenom: firstDenom,
+            kontraLevel: kontraLevel, passCount: passCount, contract: contract,
+            trump: trump, declarer: declarer, dummy: dummy, hands: hands,
+            currentTrick: currentTrick, tricks: tricks, trickCount: trickCount,
+            trickHistory: trickHistory, bidsLog: bidsLog
+        }))
+    });
+}
+
+function sendUndoState() { // csak az utolso akcio gazdaja vonhat vissza
+    const actor = (history.length > 0 && (phase === 'licit' || phase === 'jatek') && claimPending === null)
+        ? history[history.length - 1].actor : -1;
+    io.emit('undoState', { actor: actor });
+}
+
+function resyncAll() { // teljes ujraszinkronizalas mindenkinek (visszavonas utan)
+    players.forEach((p, i) => { if (p !== null) resync(i, p.sock); });
+    spectators.forEach(s => resync(-1, s.sock));
+}
+
 function finishGame() { // parti vege: eredmeny + minden lap es az utesek felfedese
     phase = 'vege';
     const declSide = declarer % 2;
@@ -253,6 +292,7 @@ function finishGame() { // parti vege: eredmeny + minden lap es az utesek felfed
     io.emit('reveal', lastReveal);
     io.emit('gameOver', lastGameOver);
     io.emit('turn', -1);
+    sendUndoState(); // vege: nincs tobb visszavonas
     sendPlist();
     broadcastState();
 }
@@ -300,6 +340,7 @@ function newGame() {
     tricks = [0, 0];
     trickCount = 0;
     bidsLog = [];
+    history = [];
     lastGameOver = null;
     lastReveal = null;
     trickHistory = [];
@@ -308,7 +349,7 @@ function newGame() {
     gameNo++;
     currentDealer = dealer;
     const deck = shuffle(DECK.slice());
-    const names = players.map(p => p.name);
+    const names = players.map(p => p === null ? '?' : p.name);
     for (let i = 0; i < 4; i++) {
         hands[i] = deck.slice(i * 13, i * 13 + 13);
         players[i].sock.emit('deal', { seat: i, cards: hands[i], dealer: dealer, names: names, gameNo: gameNo });
@@ -324,11 +365,11 @@ function newGame() {
 // Ujracsatlakozo jatekosnak a teljes jatekallas ujrakuldese
 function resync(seat, sock) {
     if (gameNo === 0) return;
-    const names = players.map(p => p.name);
+    const names = players.map(p => p === null ? '?' : p.name);
     const sendCounts = hands.map(h => h.length);
     currentTrick.forEach(t => sendCounts[t.seat]++); // az asztalon levo lapokat ujra "kijatsszuk"
     sock.emit('deal', {
-        seat: seat, cards: hands[seat], dealer: currentDealer, names: names,
+        seat: seat, cards: seat >= 0 ? hands[seat] : [], dealer: currentDealer, names: names,
         gameNo: gameNo, counts: sendCounts, tricks: tricks
     });
     bidsLog.forEach(b => sock.emit('bidMade', b));
@@ -375,7 +416,7 @@ function announceBid(seat, text) { // licitlepes kikuldese es naplozasa
 }
 
 function seatOf(sock) {
-    return players.findIndex(p => p.sock === sock);
+    return players.findIndex(p => p !== null && p.sock === sock);
 }
 
 function dropPlayer(sock) {
@@ -383,22 +424,23 @@ function dropPlayer(sock) {
     if (seat >= 0) {
         const name = players[seat].name;
         if (phase !== 'varakozas') {
-            // Jatek kozben nem dobjuk ki: a helye megmarad, ugyanazzal a
-            // nevvel visszalepve folytathatja
+            // Jatek kozben a hely megmarad: ugyanazzal a nevvel visszaulhet,
+            // vagy a tobbiek kidobhatjak es mas ulhet a helyere
             players[seat].connected = false;
             io.emit('message', name + ' kapcsolata megszakadt - ugyanazzal a névvel belépve folytathatja.');
+            if (phase === 'licit' || phase === 'jatek') {
+                io.emit('playerLeft', { seat: seat, name: name });
+            }
         }
         else {
-            players.splice(seat, 1);
-            seatingDone = false; // ha valaki kilep, ujra kell valasztani az ulesrendet
-            seatChooser = null;
-            seatOthers = [];
+            players[seat] = null; // a lobbyban a hely felszabadul
             io.emit('message', name + ' kilépett.');
         }
     }
     else {
         spectators = spectators.filter(s => s.sock !== sock);
     }
+    sendSeats();
     sendPlist();
     broadcastState();
 }
@@ -416,7 +458,7 @@ io.on('connection', (sock) => {
         // Visszacsatlakozas: az azonos nevu jatekos atveszi a regi szeket,
         // akkor is, ha a regi kapcsolat szetesese meg nem ert be a szerverre
         // (ujratolteskor az uj kapcsolat gyakran megelozi a regi lebontasat)
-        const back = players.findIndex(p => p.name === name);
+        const back = players.findIndex(p => p !== null && p.name === name);
         if (back >= 0) {
             spectators = spectators.filter(s => s.sock !== sock); // ha kozben nezelodo lett
             const old = players[back].sock;
@@ -426,29 +468,65 @@ io.on('connection', (sock) => {
                 old.disconnect(true); // a regi, arva kapcsolat bontasa
             }
             console.log('Visszatert ' + name + ' ID: ' + sock.id);
-            io.emit('message', name + ' visszatért, folytatódik a játék.');
+            io.emit('message', name + ' visszatért.');
             resync(back, sock);
+            sendSeats();
             sendPlist();
             broadcastState();
             return;
         }
-        if (spectators.some(s => s.sock === sock)) return; // mar nezelodo
-        if (players.length < 4) {
-            players.push({ sock: sock, name: name, connected: true });
-            console.log('Belepett ' + name + ' ID: ' + sock.id);
-            if (players.length === 4) {
-                io.emit('message', 'Negyen vagyunk, indulhat a játék!');
-                io.emit('canstart');
-            }
-            else {
-                io.emit('message', name + ' belépett. Várunk, míg negyen leszünk... (' + players.length + '/4)');
-            }
+        if (spectators.some(s => s.sock === sock)) return; // mar bent van
+        spectators.push({ sock: sock, name: name }); // mindenki nezelodokent indul, aztan leul
+        console.log('Belepett ' + name + ' ID: ' + sock.id);
+        io.emit('message', name + ' belépett.');
+        sendSeats();
+        sendPlist();
+        broadcastState();
+        if (gameNo > 0 && phase !== 'varakozas') resync(-1, sock); // futo jatek nezelodokent
+    });
+
+    //
+    // Leules egy ures helyre / felallas / megszakadt jatekos kidobasa
+    //
+    sock.on('sit', (s) => {
+        if (!Number.isInteger(s) || s < 0 || s > 3) return;
+        if (players[s] !== null) return; // foglalt
+        if (seatOf(sock) >= 0) return;   // mar ul valahol
+        const spec = spectators.find(x => x.sock === sock);
+        if (!spec) return;
+        spectators = spectators.filter(x => x.sock !== sock);
+        players[s] = { sock: sock, name: spec.name, connected: true };
+        io.emit('message', spec.name + ' leült (' + SEAT_NAMES[s] + ').');
+        sendSeats();
+        sendPlist();
+        broadcastState();
+        if (phase !== 'varakozas') resync(s, sock); // jatek kozben beulve atveszi a helyet
+    });
+
+    sock.on('stand', () => {
+        const seat = seatOf(sock);
+        if (seat < 0) return;
+        if (phase === 'licit' || phase === 'jatek') {
+            sock.emit('message', 'Játék közben nem lehet felállni.');
+            return;
         }
-        else {
-            spectators.push({ sock: sock, name: name });
-            sock.emit('message', 'A játék megtelt (4 játékos), nézelődőként léphetsz be.');
-            io.emit('message', name + ' belépett nézelődőként.');
-        }
+        const name = players[seat].name;
+        players[seat] = null;
+        spectators.push({ sock: sock, name: name });
+        io.emit('message', name + ' felállt.');
+        sendSeats();
+        sendPlist();
+        broadcastState();
+    });
+
+    sock.on('kick', (s) => {
+        if (!Number.isInteger(s) || s < 0 || s > 3) return;
+        if (seatOf(sock) < 0) return; // csak ulo jatekos dobhat ki
+        if (players[s] === null || players[s].connected) return; // csak megszakadt jatekost
+        const name = players[s].name;
+        players[s] = null;
+        io.emit('message', name + ' helyét felszabadították - bárki leülhet oda.');
+        sendSeats();
         sendPlist();
         broadcastState();
     });
@@ -468,50 +546,15 @@ io.on('connection', (sock) => {
     });
 
     sock.on('ujparti', () => {
-        if (players.length < 4) {
-            sock.emit('message', 'Négy játékos kell az indításhoz.');
+        if (!seatsFull()) {
+            sock.emit('message', 'Négy leült játékos kell az indításhoz.');
             return;
         }
         if (seatOf(sock) < 0) {
-            sock.emit('message', 'Új partit csak játékos indíthat.');
+            sock.emit('message', 'Új partit csak leült játékos indíthat.');
             return;
         }
         if (phase === 'licit' && Date.now() - lastDealAt < 3000) return; // dupla kattintas vedelem
-        if (!seatingDone) { // elso indites: az indito (Eszak) valasztja az ulesrendet
-            const seat = seatOf(sock);
-            if (seatChooser !== null) return; // mar folyamatban van a valasztas
-            seatChooser = sock;
-            seatOthers = players.filter(p => p.sock !== sock);
-            sock.emit('seatSetup', { names: seatOthers.map(p => p.name) });
-            io.emit('message', players[seat].name + ' (Észak) választja az ülésrendet...');
-            return;
-        }
-        newGame();
-    });
-
-    //
-    // Ulesrend valasztas: az indito Eszak, o mondja meg ki a partnere (Del)
-    // es ki uljon Keletre; a negyedik jatekos Nyugat lesz
-    //
-    sock.on('seatChoice', (data) => {
-        if (sock !== seatChooser) return;
-        if (!data || typeof data !== 'object') return;
-        const p = data.partner;
-        const k = data.kelet;
-        if (!Number.isInteger(p) || !Number.isInteger(k) || p < 0 || p > 2 || k < 0 || k > 2 || p === k) return;
-        const chooser = players.find(pl => pl.sock === sock);
-        if (!chooser || seatOthers.some(o => !players.includes(o))) { // valaki kozben kilepett
-            seatChooser = null;
-            seatOthers = [];
-            return;
-        }
-        const west = seatOthers.find((o, i) => i !== p && i !== k);
-        players = [chooser, seatOthers[k], seatOthers[p], west];
-        seatingDone = true;
-        seatChooser = null;
-        seatOthers = [];
-        io.emit('message', 'Ülésrend - É: ' + players[0].name + ', K: ' + players[1].name +
-            ', D: ' + players[2].name + ', NY: ' + players[3].name);
         newGame();
     });
 
@@ -533,6 +576,7 @@ io.on('connection', (sock) => {
                 if (level < highestBid.level) return;
                 if (level === highestBid.level && DENOMS.indexOf(denom) <= DENOMS.indexOf(highestBid.denom)) return;
             }
+            pushHistory(seat);
             highestBid = { level: level, denom: denom, seat: seat };
             if (firstDenom[(seat % 2) + denom] === undefined) { // ki mondta eloszor a nemet az oldalon
                 firstDenom[(seat % 2) + denom] = seat;
@@ -544,6 +588,7 @@ io.on('connection', (sock) => {
         }
         else if (b.type === 'kontra') {
             if (highestBid === null || kontraLevel !== 0 || (seat % 2) === (highestBid.seat % 2)) return;
+            pushHistory(seat);
             kontraLevel = 1;
             passCount = 0;
             io.emit('message', name + ': Kontra');
@@ -551,12 +596,14 @@ io.on('connection', (sock) => {
         }
         else if (b.type === 'rekontra') {
             if (kontraLevel !== 1 || (seat % 2) !== (highestBid.seat % 2)) return;
+            pushHistory(seat);
             kontraLevel = 2;
             passCount = 0;
             io.emit('message', name + ': Rekontra');
             announceBid(seat, 'Rekontra');
         }
         else if (b.type === 'passz') {
+            pushHistory(seat);
             passCount++;
             io.emit('message', name + ': Passz');
             announceBid(seat, 'Passz');
@@ -613,6 +660,37 @@ io.on('connection', (sock) => {
     });
 
     //
+    // Utolso akcio (licit vagy lapkijatszas) visszavonasa - csak az
+    // vonhatja vissza, ake az utolso lepes volt, es lancban tobben is
+    //
+    sock.on('undo', () => {
+        if ((phase !== 'licit' && phase !== 'jatek') || claimPending !== null) return;
+        if (history.length === 0) return;
+        const seat = seatOf(sock);
+        if (seat < 0 || seat !== history[history.length - 1].actor) return;
+        const s = history.pop().snap;
+        phase = s.phase;
+        turn = s.turn;
+        highestBid = s.highestBid;
+        firstDenom = s.firstDenom;
+        kontraLevel = s.kontraLevel;
+        passCount = s.passCount;
+        contract = s.contract;
+        trump = s.trump;
+        declarer = s.declarer;
+        dummy = s.dummy;
+        hands = s.hands;
+        currentTrick = s.currentTrick;
+        tricks = s.tricks;
+        trickCount = s.trickCount;
+        trickHistory = s.trickHistory;
+        bidsLog = s.bidsLog;
+        stopAuto();
+        io.emit('message', players[seat].name + ' visszavonta az utolsó lépést.');
+        resyncAll();
+    });
+
+    //
     // "Minden utest viszek" bejelentes: ha az ellenfelek elfogadjak,
     // a hatralevo utesek a bejelento vonalae es vege a partinak
     //
@@ -624,7 +702,8 @@ io.on('connection', (sock) => {
         const needed = [oppSide, oppSide + 2].filter(s => s !== dummy); // az asztal nem szavaz
         claimPending = { seat: seat, needed: needed, accepted: [] };
         io.emit('message', players[seat].name + ' bejelentette: minden ütést visz.');
-        io.emit('claimAsk', { claimerSeat: seat, claimerName: players[seat].name, needed: needed });
+        io.emit('claimAsk', { claimerSeat: seat, claimerName: players[seat].name, needed: needed, cards: hands[seat] });
+        sendUndoState();
     });
 
     sock.on('claimAnswer', (accept) => {

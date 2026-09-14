@@ -19,20 +19,12 @@
         <div id="game-info">
           <div id="info-parti"></div>
           <div id="info-bemondas"></div>
+          <div id="info-turn"></div>
           <div id="info-utesek"></div>
-        </div>
-        <div class="button-wrapper">
-          <form id="start-game">
-            <button id="start">Játék indítása</button>
-          </form>
+          <div id="info-licit"></div>
         </div>
       </div>
       <div class="game-place">
-        <div id="state" class="state-bar"></div>
-        <div id="seat-setup">
-          <div id="seat-setup-title"></div>
-          <div id="seat-setup-buttons"></div>
-        </div>
         <div class="seat seat-top">
           <div class="fan" id="fanR2"></div>
           <div class="plate" id="plateR2"></div>
@@ -43,6 +35,7 @@
             <div class="plate" id="plateR1"></div>
           </div>
           <div id="center-box">
+            <button id="start-center">Játék indítása</button>
             <div id="bid-history"></div>
             <div id="trick-history"></div>
             <div class="trick-pos" id="trickR0"></div>
@@ -73,7 +66,28 @@
         <div id="game-buttons">
           <button id="ujparti-butt">Új parti</button>
           <button id="claim-butt">Minden ütést viszek</button>
+          <button id="undo-butt">Visszavonás</button>
           <button id="auto-butt">Auto befejezés</button>
+        </div>
+        <div id="confirm-modal">
+          <div id="confirm-box">
+            <div id="confirm-title">Biztosan abbahagyjátok a mostani partit?</div>
+            <div id="confirm-buttons">
+              <button id="confirm-yes">Igen, új parti</button>
+              <button id="confirm-no">Mégse</button>
+            </div>
+          </div>
+        </div>
+        <div id="left-modal">
+          <div id="left-box">
+            <div id="left-title"></div>
+            <div id="left-text">Várjátok vissza, vagy kezdtek egy új partit?
+              (A helyéről ki is dobhatjátok, és más ülhet oda.)</div>
+            <div id="left-buttons">
+              <button id="left-wait">Várunk rá</button>
+              <button id="left-ujparti">Új parti</button>
+            </div>
+          </div>
         </div>
         <div id="claim-modal">
           <div id="claim-box">
@@ -86,11 +100,11 @@
           </div>
         </div>
         <div id="chat-area">
-          <div id="chat-log"></div>
           <form id="chat-form">
             <input id="chat-input" autocomplete="off" maxlength="200" placeholder="Üzenet a játékosoknak...">
             <button id="chat-send">Küldés</button>
           </form>
+          <div id="chat-log"></div>
         </div>
         <div id="result-modal">
           <div id="result-box">

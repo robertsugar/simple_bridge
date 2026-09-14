@@ -60,8 +60,21 @@ async function run() {
     for (const n of NAMES) {
         socks.push(await connectPlayer(n));
     }
-    await waitFor(socks[0], 'canstart');
-    assert(true, 'canstart megjott negy jatekos utan');
+    // Mindenki leul a valasztott helyere: Anna=0/É, Bela=1/K, Cili=2/D, Denes=3/NY
+    let seatsNow = [null, null, null, null];
+    socks[0].on('seats', x => { seatsNow = x; });
+    socks.forEach((s, i) => s.emit('sit', i));
+    await new Promise((res, rej) => {
+        const t0 = Date.now();
+        const iv = setInterval(() => {
+            if (seatsNow.every(x => x !== null)) { clearInterval(iv); res(); }
+            else if (Date.now() - t0 > 5000) { clearInterval(iv); rej(new Error('nem ult le mindenki')); }
+        }, 50);
+    });
+    assert(seatsNow[0].name === 'Anna' && seatsNow[1].name === 'Bela' &&
+        seatsNow[2].name === 'Cili' && seatsNow[3].name === 'Denes',
+        'mindenki a valasztott helyen ul (É:' + seatsNow[0].name + ' K:' + seatsNow[1].name +
+        ' D:' + seatsNow[2].name + ' NY:' + seatsNow[3].name + ')');
 
     // Minden figyelot es botot a parti inditasa ELOTT allitunk be,
     // hogy egyetlen esemeny se vesszen el.
@@ -143,19 +156,8 @@ async function run() {
     assert(chatMsg.name === 'Anna' && chatMsg.text === 'Szia mindenki!',
         'az uzenet nevvel egyutt mindenkihez eljut');
 
-    console.log('2. Ulesrend valasztas es parti inditasa...');
-    // Anna nyomja meg a Jatek inditasat: o lesz Eszak, es o valaszt
-    const seatSetupP = waitFor(socks[0], 'seatSetup');
+    console.log('2. Parti inditasa...');
     socks[0].emit('ujparti');
-    const setup = await seatSetupP;
-    assert(setup.names.length === 3 && setup.names.includes('Bela') &&
-        setup.names.includes('Cili') && setup.names.includes('Denes'),
-        'az indito megkapja a masik harom nevet: ' + setup.names.join(', '));
-    // Partner (Del): Cili, Kelet: Bela -> ulesrend: Anna=0/E, Bela=1/K, Cili=2/D, Denes=3/NY
-    socks[0].emit('seatChoice', {
-        partner: setup.names.indexOf('Cili'),
-        kelet: setup.names.indexOf('Bela')
-    });
     const hands = {};
     for (let i = 0; i < 4; i++) {
         const d = await deals[i];
@@ -165,11 +167,6 @@ async function run() {
     }
     const all = Object.values(hands).flat();
     assert(new Set(all).size === 52, 'mind az 52 lap kulonbozo');
-    // Tobb seatSetup mar nem johet: az ulesrend megvan
-    socks.forEach(s => s.on('seatSetup', () => {
-        failed = true;
-        console.error('  FAIL: ujboli seatSetup erkezett, pedig az ulesrend mar megvan');
-    }));
 
     console.log('4. Licitalas: 1C, 1H, 2H, kontra, rekontra, majd harom passz...');
     releaseBidding();
@@ -264,17 +261,34 @@ async function run() {
     socks[1] = bela2;
     attachBidBot(bela2);
 
-    console.log('11. Bejelentes: minden utest viszek...');
+    console.log('11. Visszavonas, majd bejelentes: minden utest viszek...');
     // Uj parti (oszto: Denes), Denes 1 kort mond es o lesz a felvevo
     bidScript.push({ type: 'bid', level: 1, denom: 'H' }, { type: 'passz' }, { type: 'passz' }, { type: 'passz' });
+    let lastUndoActor = -1;
+    socks[0].on('undoState', d => { lastUndoActor = d.actor; });
     const deal5 = waitFor(socks[0], 'deal');
     const contract5P = waitFor(socks[3], 'contract', 10000);
+    const leadTurnP = waitFor(socks[0], 'playTurn', 10000); // Anna hiv
     // Az ellenfelek (Anna es Cili) elfogadjak a bejelentest
     [socks[0], socks[2]].forEach(s => s.once('claimAsk', () => s.emit('claimAnswer', true)));
     socks[0].emit('ujparti');
     await deal5;
     const contract5 = await contract5P;
     assert(contract5.declarerSeat === 3 && contract5.dummySeat === 1, 'Denes a felvevo, Bela az asztal');
+
+    // Visszavonas: Anna kijatszik egy lapot, majd visszavonja
+    const lead = await leadTurnP;
+    const played1 = waitFor(socks[1], 'cardPlayed', 5000);
+    socks[0].emit('playcard', lead.legal[0]);
+    await played1;
+    await new Promise(r => setTimeout(r, 150));
+    assert(lastUndoActor === 0, 'a lapot kijatszo Anna vonhatja vissza (aktor: ' + lastUndoActor + ')');
+    const undoResync = waitFor(socks[1], 'deal', 5000); // visszavonas utan mindenki ujraszinkronizal
+    socks[0].emit('undo');
+    const ur = await undoResync;
+    assert(ur.counts && ur.counts.every(c => c === 13), 'a visszavont lap visszakerult a kezbe');
+    await new Promise(r => setTimeout(r, 150));
+    assert(lastUndoActor === 2, 'most az elozo lepes gazdaja (Cili passza) vonhato vissza (aktor: ' + lastUndoActor + ')');
     // a varakozok csak most, hogy a resync-bol erkezo regi gameOver-t ne kapjak el
     const claimAskP = waitFor(socks[1], 'claimAsk', 10000);
     const gameOver5P = waitFor(socks[1], 'gameOver', 10000);
