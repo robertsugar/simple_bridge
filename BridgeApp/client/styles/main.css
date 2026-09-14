@@ -293,8 +293,8 @@ body {
     margin-top: 6px;
 }
 #center-box {
-    width: min(680px, 44vw);
-    height: 500px;
+    width: 540px;
+    height: 380px;
     background-color: #b9cdd2;
     border-radius: 10px;
     position: relative;
@@ -352,13 +352,13 @@ body {
     pointer-events: none;
 }
 .trick-pos .card {
-    width: calc((100vw - 260px) / 10); /* nagyobb, mint a kez lapjai */
+    width: calc((100vw - 260px) / 13); /* akkora, mint a kez lapjai */
     height: auto;
     aspect-ratio: 27 / 40;
     box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.35);
 }
 .trick-pos .card .rank, .trick-pos .card .suit {
-    font-size: clamp(40px, 4.6vw, 84px);
+    font-size: clamp(32px, 3.6vw, 64px);
 }
 #trickR0 { left: 25%; right: 25%; bottom: 3%; height: 55%; align-items: flex-end; }
 #trickR2 { left: 25%; right: 25%; top: 3%; height: 55%; align-items: flex-start; }
