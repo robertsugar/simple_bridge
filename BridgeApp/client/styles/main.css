@@ -374,7 +374,7 @@ body {
 #trickR3 { right: 8%; top: 15%; bottom: 15%; width: 40%; justify-content: flex-end; }
 /* Utes-animacio: a lapok a gyoztes fele usznak es elhalvanyulnak */
 .trick-pos .card.fly {
-    transition: transform 0.8s ease-in 0.35s, opacity 0.8s ease-in 0.35s;
+    transition: transform 0.8s ease-in 0.05s, opacity 0.8s ease-in 0.05s;
     opacity: 0.1;
 }
 .card.fly-0 { transform: translateY(170px) scale(0.7); }

@@ -27,7 +27,6 @@ let inGame = false;
 let tricksPair = [0, 0];
 let bids = [];          // {seat, text} a licitmenet sorban
 let pendingPlay = null; // {actingSeat, fromDummy, legal} ha en jovok
-let trickFull = false;  // az asztalon teljes utes van, a kovetkezo lapnal torlendo
 let revealHands = null; // parti vegen: mindenki eredeti lapjai
 let trickHist = [];     // parti vegen: az utesek es kik vittek oket
 let seatsState = [null, null, null, null]; // ki ul melyik szeken (lobby)
@@ -37,9 +36,13 @@ let claimCards = [];
 let undoActor = -1;     // ki vonhatja vissza az utolso lepest
 let gameEnded = false;  // lezarult-e az aktualis parti
 let pendingReveal = null;
-let trickClearTimer = null;
 let trickZ = 1;
 let leftSeat = -1;   // az eppen kiesett jatekos szeke
+// Az asztal megjelenitesi sora: a teljes utes par masodpercig latszik,
+// a kozben kijatszott lapok megvarjak, mig a gyoztes elviszi oket
+let tableQueue = [];
+let tableBusy = false;
+let tableGen = 0;
 
 // Lapok sorrendje balrol jobbra (ill. fentrol le): adu (ha van),
 // pikk, kor, treff, karo
@@ -312,21 +315,55 @@ function clearTrick() {
     for (let i = 0; i < 4; i++) {
         document.getElementById('trickR' + i).innerHTML = '';
     }
-    trickFull = false;
     trickZ = 1;
-    if (trickClearTimer) {
-        clearTimeout(trickClearTimer);
-        trickClearTimer = null;
-    }
+}
+
+function resetTableQueue() { // uj osztasnal/visszavonasnal minden fuggo animacio ervenytelen
+    tableGen++;
+    tableQueue = [];
+    tableBusy = false;
+    clearTrick();
 }
 
 function showOnTable(seat, card) {
-    if (trickFull) clearTrick();
     const pos = document.getElementById('trickR' + slotOf(seat));
     pos.innerHTML = '';
     const el = cardEl(card);
     el.style.zIndex = trickZ++; // a kesobbi lap felulre
     pos.appendChild(el);
+}
+
+function enqueueTable(ev) {
+    tableQueue.push(ev);
+    pumpTable();
+}
+
+function pumpTable() {
+    if (tableBusy) return;
+    const ev = tableQueue.shift();
+    if (!ev) return;
+    if (ev.type === 'card') {
+        showOnTable(ev.seat, ev.card);
+        pumpTable();
+        return;
+    }
+    // teljes utes: par masodpercig mozdulatlanul latszik, aztan a gyoztes elviszi
+    tableBusy = true;
+    const gen = tableGen;
+    setTimeout(() => {
+        if (gen !== tableGen) return;
+        const rel = slotOf(ev.winnerSeat);
+        for (let i = 0; i < 4; i++) {
+            const c = document.querySelector('#trickR' + i + ' .card');
+            if (c) c.classList.add('fly', 'fly-' + rel);
+        }
+        setTimeout(() => {
+            if (gen !== tableGen) return;
+            clearTrick();
+            tableBusy = false;
+            pumpTable();
+        }, 900);
+    }, 2000);
 }
 
 function playCard(card) {
@@ -429,7 +466,7 @@ function resetGameView() {
     tricksPair = [0, 0];
     bids = [];
     pendingPlay = null;
-    clearTrick();
+    resetTableQueue();
     hideBidButtons();
     hideDiv('auto-butt');
     hideDiv('claim-butt');
@@ -697,22 +734,12 @@ const onEntrySubmitted = (e) => {
             if (data.seat === mySeat) {
                 myHand = myHand.filter(c => c !== data.card);
             }
-            showOnTable(data.seat, data.card);
+            enqueueTable({ type: 'card', seat: data.seat, card: data.card });
             renderSeats();
         });
         sock.on('trickDone', (data) => {
             tricksPair = data.tricks;
-            trickFull = true; // a kovetkezo kijatszott lapnal (vagy idozitve) urul az asztal
-            const rel = slotOf(data.winnerSeat); // a lapok a gyoztes fele uszanak
-            for (let i = 0; i < 4; i++) {
-                const c = document.querySelector('#trickR' + i + ' .card');
-                if (c) c.classList.add('fly', 'fly-' + rel);
-            }
-            if (trickClearTimer) clearTimeout(trickClearTimer);
-            trickClearTimer = setTimeout(() => {
-                trickClearTimer = null;
-                if (trickFull) clearTrick();
-            }, 1500);
+            enqueueTable({ type: 'trickEnd', winnerSeat: data.winnerSeat });
             renderSeats();
             renderInfo();
         });
@@ -733,7 +760,7 @@ const onEntrySubmitted = (e) => {
                     revealHands = pendingReveal.hands;
                     trickHist = pendingReveal.tricksHist;
                     pendingReveal = null;
-                    clearTrick();
+                    resetTableQueue();
                     renderSeats();
                     renderTrickHistory();
                 }
@@ -747,7 +774,7 @@ const onEntrySubmitted = (e) => {
                         '<div>Eredmény: <b>' + diffTxt + '</b></div>';
                     showDiv('result-modal', 'flex');
                 }
-            }, 1800);
+            }, 3300);
         });
         sock.on('claimAsk', (d) => { // valaki bejelentette: minden utest visz
             claimSeat = d.claimerSeat;
