@@ -79,6 +79,10 @@ function shuffle(arr) {
     return arr;
 }
 
+function nameOf(seat) { // ules neve akkor is, ha kozben kiurult
+    return players[seat] ? players[seat].name : '(üres hely)';
+}
+
 function pairName(side) { // 0: 0-2 szekpar, 1: 1-3 szekpar
     const a = players[side] ? players[side].name : '?';
     const b = players[side + 2] ? players[side + 2].name : '?';
@@ -92,7 +96,7 @@ function seatsFull() {
 }
 
 function sendSeats() { // ulesek allapota minden kliensnek
-    io.emit('seats', players.map(p => p === null ? null : { name: p.name, connected: p.connected }));
+    io.emit('seats', players.map(p => p === null ? null : { name: p.name, connected: p.connected, bot: !!p.bot }));
 }
 
 function sendPlist() { // jatekos lista kikuldese, jelolve kinek a kore van
@@ -123,16 +127,16 @@ function broadcastState() { // allapotsor minden kliensnek
         text = 'Licit';
         if (highestBid !== null) {
             text += ' - állás: ' + bidText(highestBid.level, highestBid.denom) + kontraText() +
-                ' (' + players[highestBid.seat].name + ')';
+                ' (' + nameOf(highestBid.seat) + ')';
         }
-        text += ' - ' + players[turn].name + ' jön';
+        text += ' - ' + nameOf(turn) + ' jön';
     }
     if (phase === 'vege' && declarer === null) text = 'Mindenki passzolt, nincs játék.';
     if ((phase === 'jatek' || phase === 'vege') && declarer !== null) {
         text = 'Bemondás: ' + bidText(contract.level, contract.denom) + kontraText() +
-            ' - Felvevő: ' + players[declarer].name + ' | Ütések - ' +
+            ' - Felvevő: ' + nameOf(declarer) + ' | Ütések - ' +
             pairName(0) + ': ' + tricks[0] + ' | ' + pairName(1) + ': ' + tricks[1];
-        if (phase === 'jatek') text += ' | ' + players[turn].name + ' jön';
+        if (phase === 'jatek') text += ' | ' + nameOf(turn) + ' jön';
     }
     io.emit('state', text);
 }
@@ -148,7 +152,7 @@ function legalCards(seat) { // kovesd a szint, ha tudod
 function promptBid() {
     const canKontra = highestBid !== null && kontraLevel === 0 && (turn % 2) !== (highestBid.seat % 2);
     const canRekontra = kontraLevel === 1 && (turn % 2) === (highestBid.seat % 2);
-    players[turn].sock.emit('bidTurn', {
+    if (players[turn] !== null) players[turn].sock.emit('bidTurn', {
         highest: highestBid === null ? null : { level: highestBid.level, denom: highestBid.denom },
         kontra: canKontra,
         rekontra: canRekontra
@@ -157,12 +161,13 @@ function promptBid() {
     sendUndoState();
     sendPlist();
     broadcastState();
+    scheduleBot();
 }
 
 function promptPlay() {
     const acting = turn;
     const controller = (acting === dummy) ? declarer : acting; // a felvevo jatszik az asztal lapjaibol is
-    players[controller].sock.emit('playTurn', {
+    if (players[controller] !== null) players[controller].sock.emit('playTurn', {
         actingSeat: acting,
         fromDummy: acting === dummy,
         legal: legalCards(acting)
@@ -171,6 +176,7 @@ function promptPlay() {
     sendUndoState();
     sendPlist();
     broadcastState();
+    scheduleBot();
 }
 
 function startPlay() {
@@ -185,15 +191,15 @@ function startPlay() {
     tricks = [0, 0];
     trickCount = 0;
     io.emit('message', '--- Bemondás: ' + bidText(contract.level, contract.denom) + kontraText() +
-        ', ' + players[declarer].name + ' a felvevő, ' + players[dummy].name +
-        ' teríti a lapjait, ' + players[turn].name + ' indul ---');
+        ', ' + nameOf(declarer) + ' a felvevő, ' + nameOf(dummy) +
+        ' teríti a lapjait, ' + nameOf(turn) + ' indul ---');
     io.emit('contract', {
         level: contract.level,
         denom: contract.denom,
         declarerSeat: declarer,
-        declarerName: players[declarer].name,
+        declarerName: nameOf(declarer),
         dummySeat: dummy,
-        dummyName: players[dummy].name,
+        dummyName: nameOf(dummy),
         kontraLevel: kontraLevel
     });
     promptPlay(); // az asztal csak az elso kihivott lap utan terul le
@@ -203,15 +209,15 @@ function doPlayCard(acting, card) { // ervenyesitett lap kijatszasa es a jatek l
     pushHistory(acting === dummy ? declarer : acting); // a visszavonashoz
     hands[acting] = hands[acting].filter(c => c !== card);
     currentTrick.push({ seat: acting, card: card });
-    io.emit('cardPlayed', { seat: acting, name: players[acting].name, card: card });
+    io.emit('cardPlayed', { seat: acting, name: nameOf(acting), card: card });
     if (trickCount === 0 && currentTrick.length === 1) { // az elso kihivas utan terul az asztal
-        io.emit('dummyHand', { seat: dummy, name: players[dummy].name, cards: hands[dummy] });
-        players[dummy].sock.emit('partnerHand', { seat: declarer, cards: hands[declarer] });
+        io.emit('dummyHand', { seat: dummy, name: nameOf(dummy), cards: hands[dummy] });
+        if (players[dummy] !== null) players[dummy].sock.emit('partnerHand', { seat: declarer, cards: hands[declarer] });
     }
     if (acting === dummy) {
-        io.emit('dummyHand', { seat: dummy, name: players[dummy].name, cards: hands[dummy] });
+        io.emit('dummyHand', { seat: dummy, name: nameOf(dummy), cards: hands[dummy] });
     }
-    if (acting === declarer) { // az asztal latja a felvevo lapjait
+    if (acting === declarer && players[dummy] !== null) { // az asztal latja a felvevo lapjait
         players[dummy].sock.emit('partnerHand', { seat: declarer, cards: hands[declarer] });
     }
     if (currentTrick.length === 4) {
@@ -272,7 +278,7 @@ function finishGame() { // parti vege: eredmeny + minden lap es az utesek felfed
     const result = tricks[declSide] >= needed
         ? 'teljesítette a bemondást (' + tricks[declSide] + ' ütés, kellett: ' + needed + ')'
         : 'elbukta a bemondást (' + tricks[declSide] + ' ütés, kellett: ' + needed + ')';
-    io.emit('message', '=== Vége a partinak! ' + players[declarer].name + ' ' +
+    io.emit('message', '=== Vége a partinak! ' + nameOf(declarer) + ' ' +
         bidText(contract.level, contract.denom) + kontraText() + ': ' + result + '. ' +
         pairName(declSide) + ': ' + tricks[declSide] + ' ütés, ' +
         pairName(1 - declSide) + ': ' + tricks[1 - declSide] + ' ütés ===');
@@ -283,7 +289,7 @@ function finishGame() { // parti vege: eredmeny + minden lap es az utesek felfed
         level: contract.level,
         denom: contract.denom,
         kontraLevel: kontraLevel,
-        declarerName: players[declarer].name,
+        declarerName: nameOf(declarer),
         declTricks: tricks[declSide],
         needed: needed,
         diff: tricks[declSide] - needed
@@ -307,11 +313,11 @@ function resolveTrick() {
     tricks[winner.seat % 2]++;
     trickCount++;
     trickHistory.push({ cards: currentTrick.slice(), winnerSeat: winner.seat });
-    io.emit('message', players[winner.seat].name + ' vitte az ütést (' +
+    io.emit('message', nameOf(winner.seat) + ' vitte az ütést (' +
         currentTrick.map(t => cardName(t.card)).join(', ') + ')');
     io.emit('trickDone', {
         winnerSeat: winner.seat,
-        winnerName: players[winner.seat].name,
+        winnerName: nameOf(winner.seat),
         tricks: tricks,
         pairNames: [pairName(0), pairName(1)]
     });
@@ -378,19 +384,19 @@ function resync(seat, sock) {
             level: contract.level,
             denom: contract.denom,
             declarerSeat: declarer,
-            declarerName: players[declarer].name,
+            declarerName: nameOf(declarer),
             dummySeat: dummy,
-            dummyName: players[dummy].name,
+            dummyName: nameOf(dummy),
             kontraLevel: kontraLevel
         });
         const revealed = trickCount > 0 || currentTrick.length > 0; // volt-e mar kihivas
         if (revealed) {
-            sock.emit('dummyHand', { seat: dummy, name: players[dummy].name, cards: hands[dummy] });
+            sock.emit('dummyHand', { seat: dummy, name: nameOf(dummy), cards: hands[dummy] });
             if (seat === dummy) {
                 sock.emit('partnerHand', { seat: declarer, cards: hands[declarer] });
             }
         }
-        currentTrick.forEach(t => sock.emit('cardPlayed', { seat: t.seat, name: players[t.seat].name, card: t.card }));
+        currentTrick.forEach(t => sock.emit('cardPlayed', { seat: t.seat, name: nameOf(t.seat), card: t.card }));
     }
     if (phase === 'licit') promptBid();       // a soron levo ujra megkapja a lehetosegeit
     else if (phase === 'jatek') {
@@ -398,7 +404,7 @@ function resync(seat, sock) {
         if (claimPending !== null) {
             sock.emit('claimAsk', {
                 claimerSeat: claimPending.seat,
-                claimerName: players[claimPending.seat].name,
+                claimerName: nameOf(claimPending.seat),
                 needed: claimPending.needed
             });
         }
@@ -413,6 +419,201 @@ function announceBid(seat, text) { // licitlepes kikuldese es naplozasa
     const b = { seat: seat, text: text };
     bidsLog.push(b);
     io.emit('bidMade', b);
+}
+
+function applyClaimAnswer(seat, accept) { // bejelentesre adott valasz (embertol vagy bottol)
+    if (phase !== 'jatek' || claimPending === null) return;
+    if (!claimPending.needed.includes(seat) || claimPending.accepted.includes(seat)) return;
+    if (!accept) { // elutasitva: folytatodik a jatek
+        io.emit('message', players[seat].name + ' nem fogadta el a bejelentést, folytatódik a játék.');
+        io.emit('claimResult', { accepted: false, name: players[seat].name });
+        claimPending = null;
+        promptPlay();
+        return;
+    }
+    claimPending.accepted.push(seat);
+    if (claimPending.accepted.length === claimPending.needed.length) { // mindenki elfogadta
+        const claimSide = claimPending.seat % 2;
+        tricks[claimSide] += 13 - trickCount;
+        io.emit('message', 'Mindenki elfogadta: a hátralévő ütéseket ' +
+            pairName(claimSide) + ' viszi.');
+        io.emit('claimResult', { accepted: true, name: nameOf(claimPending.seat) });
+        claimPending = null;
+        finishGame();
+    }
+}
+
+//
+// Robot jatekosok: szabaly-alapu licit (pontszamolas) es lapjatek
+//
+const BOT_NAMES = ['Robi bot', 'Rozi bot', 'Rudi bot', 'Rita bot'];
+const BOT_DELAY = Number(process.env.BOT_DELAY_MS || 1100);
+let botTimer = null;
+
+function makeBotSock() { // nema socket-helyettesito a botoknak
+    return { emit: function () { }, connected: true, disconnect: function () { } };
+}
+
+function hcpOf(hand) { // figurapontok: A=4, K=3, Q=2, J=1
+    const pts = { A: 4, K: 3, Q: 2, J: 1 };
+    return hand.reduce((sum, c) => sum + (pts[c[1]] || 0), 0);
+}
+
+function suitCount(hand, suit) {
+    return hand.filter(c => c[0] === suit).length;
+}
+
+function lowestLevelFor(denom) { // a legalacsonyabb szabalyos szint az adott nemre
+    if (highestBid === null) return 1;
+    return DENOMS.indexOf(denom) > DENOMS.indexOf(highestBid.denom)
+        ? highestBid.level : highestBid.level + 1;
+}
+
+function botBidDecision(seat) {
+    const hand = hands[seat];
+    const hcp = hcpOf(hand);
+    const mySide = seat % 2;
+    const partner = (seat + 2) % 4;
+    // Ha a sajat vonal all nyeresre, nem licital tovabb
+    if (highestBid !== null && highestBid.seat % 2 === mySide) return { type: 'passz' };
+    // Partner szinjenek emelese: 3+ lap es eleg pont
+    const partnerSuits = ['S', 'H', 'D', 'C'].filter(d => firstDenom[mySide + d] === partner);
+    for (const d of partnerSuits) {
+        if (suitCount(hand, d) >= 3 && hcp >= 6) {
+            const lvl = lowestLevelFor(d);
+            if (lvl <= 2 || (lvl <= 3 && hcp >= 10)) return { type: 'bid', level: lvl, denom: d };
+        }
+    }
+    if (hcp >= 12) {
+        const lens = ['S', 'H', 'D', 'C'].map(d => ({ d: d, n: suitCount(hand, d) }));
+        lens.sort((a, b) => b.n - a.n);
+        const balanced = lens[0].n <= 4 && lens[3].n >= 2;
+        if (hcp >= 15 && hcp <= 17 && balanced && lowestLevelFor('N') === 1) {
+            return { type: 'bid', level: 1, denom: 'N' }; // kiegyensulyozott 15-17: 1SZ
+        }
+        const best = lens[0];
+        const lvl = lowestLevelFor(best.d);
+        const maxLvl = hcp >= 16 ? 3 : 2;
+        if (lvl <= maxLvl && best.n >= (lvl >= 2 ? 5 : 4)) {
+            return { type: 'bid', level: lvl, denom: best.d };
+        }
+    }
+    return { type: 'passz' };
+}
+
+function botPlayDecision(acting) {
+    const legal = legalCards(acting);
+    const rankIx = c => RANKS.indexOf(c[1]);
+    const sorted = legal.slice().sort((a, b) => rankIx(a) - rankIx(b)); // novekvo
+    if (currentTrick.length === 0) { // hivas: a leghosszabb szin legkisebb lapja
+        const lens = ['S', 'H', 'D', 'C'].map(d => ({ d: d, n: suitCount(hands[acting], d) }));
+        lens.sort((a, b) => b.n - a.n);
+        const inSuit = sorted.filter(c => c[0] === lens[0].d);
+        return inSuit.length > 0 ? inSuit[0] : sorted[0];
+    }
+    let winner = currentTrick[0];
+    currentTrick.forEach(t => { if (beats(t.card, winner.card)) winner = t; });
+    const partner = (acting + 2) % 4;
+    const last = currentTrick.length === 3;
+    if (winner.seat === partner && (last || rankIx(winner.card) >= RANKS.indexOf('Q'))) {
+        return sorted[0]; // a partner viszi: kicsit tesz
+    }
+    const winning = sorted.filter(c => beats(c, winner.card));
+    if (winning.length > 0) return winning[0]; // a legolcsobb uto lap
+    return sorted[0]; // nem tud utni: a legkisebbet dobja
+}
+
+function scheduleBot() { // ha bot jon, kis kesleltetessel lep
+    if (botTimer) {
+        clearTimeout(botTimer);
+        botTimer = null;
+    }
+    if (claimPending !== null) return;
+    let actorSeat = null;
+    if (phase === 'licit') actorSeat = turn;
+    else if (phase === 'jatek') actorSeat = (turn === dummy) ? declarer : turn;
+    else return;
+    const p = players[actorSeat];
+    if (!p || !p.bot) return;
+    const delay = BOT_DELAY + Math.floor(Math.random() * BOT_DELAY * 0.6);
+    botTimer = setTimeout(() => {
+        botTimer = null;
+        if (claimPending !== null) return;
+        if (phase === 'licit') {
+            if (players[turn] && players[turn].bot) applyBid(turn, botBidDecision(turn));
+        }
+        else if (phase === 'jatek') {
+            const controller = (turn === dummy) ? declarer : turn;
+            if (players[controller] && players[controller].bot) {
+                doPlayCard(turn, botPlayDecision(turn));
+            }
+        }
+    }, delay);
+}
+
+function applyBid(seat, b) { // ervenyesitett licitlepes (embertol vagy bottol)
+    if (phase !== 'licit' || seat !== turn) return;
+    if (!b || typeof b !== 'object') return;
+    const name = players[seat].name;
+
+    if (b.type === 'bid') {
+        const level = b.level;
+        const denom = b.denom;
+        if (!Number.isInteger(level) || level < 1 || level > 7 || !DENOMS.includes(denom)) return;
+        if (highestBid !== null) { // csak magasabb licit mondhato
+            if (level < highestBid.level) return;
+            if (level === highestBid.level && DENOMS.indexOf(denom) <= DENOMS.indexOf(highestBid.denom)) return;
+        }
+        pushHistory(seat);
+        highestBid = { level: level, denom: denom, seat: seat };
+        if (firstDenom[(seat % 2) + denom] === undefined) { // ki mondta eloszor a nemet az oldalon
+            firstDenom[(seat % 2) + denom] = seat;
+        }
+        kontraLevel = 0;
+        passCount = 0;
+        io.emit('message', name + ': ' + bidText(level, denom));
+        announceBid(seat, bidText(level, denom));
+    }
+    else if (b.type === 'kontra') {
+        if (highestBid === null || kontraLevel !== 0 || (seat % 2) === (highestBid.seat % 2)) return;
+        pushHistory(seat);
+        kontraLevel = 1;
+        passCount = 0;
+        io.emit('message', name + ': Kontra');
+        announceBid(seat, 'Kontra');
+    }
+    else if (b.type === 'rekontra') {
+        if (kontraLevel !== 1 || (seat % 2) !== (highestBid.seat % 2)) return;
+        pushHistory(seat);
+        kontraLevel = 2;
+        passCount = 0;
+        io.emit('message', name + ': Rekontra');
+        announceBid(seat, 'Rekontra');
+    }
+    else if (b.type === 'passz') {
+        pushHistory(seat);
+        passCount++;
+        io.emit('message', name + ': Passz');
+        announceBid(seat, 'Passz');
+        if (highestBid !== null && passCount === 3) { // harom passz a licit utan
+            startPlay();
+            return;
+        }
+        if (highestBid === null && passCount === 4) { // mindenki passzolt
+            phase = 'vege';
+            io.emit('message', 'Mindenki passzolt, nincs játék. Indítsatok új partit!');
+            io.emit('turn', -1);
+            sendUndoState();
+            sendPlist();
+            broadcastState();
+            return;
+        }
+    }
+    else {
+        return;
+    }
+    turn = (turn + 1) % 4;
+    promptBid();
 }
 
 function seatOf(sock) {
@@ -539,10 +740,26 @@ io.on('connection', (sock) => {
         broadcastState();
     });
 
+    sock.on('addBot', (s) => { // robot ultetese egy ures helyre
+        if (!Number.isInteger(s) || s < 0 || s > 3) return;
+        if (players[s] !== null) return;
+        const inGameUser = seatOf(sock) >= 0 || spectators.some(x => x.sock === sock);
+        if (!inGameUser) return;
+        const name = BOT_NAMES.find(n => !players.some(p => p !== null && p.name === n)) || ('Bot-' + s);
+        players[s] = { sock: makeBotSock(), name: name, connected: true, bot: true };
+        io.emit('message', name + ' leült (' + SEAT_NAMES[s] + ').');
+        sendSeats();
+        sendPlist();
+        broadcastState();
+        if (phase === 'licit') promptBid();      // ha eppen o jonne, lepjen is
+        else if (phase === 'jatek') promptPlay();
+    });
+
     sock.on('kick', (s) => {
         if (!Number.isInteger(s) || s < 0 || s > 3) return;
         if (seatOf(sock) < 0) return; // csak ulo jatekos dobhat ki
-        if (players[s] === null || players[s].connected) return; // csak megszakadt jatekost
+        if (players[s] === null) return;
+        if (players[s].connected && !players[s].bot) return; // megszakadt jatekost vagy botot
         const name = players[s].name;
         players[s] = null;
         io.emit('message', name + ' helyét felszabadították - bárki leülhet oda.');
@@ -585,66 +802,7 @@ io.on('connection', (sock) => {
         if (phase !== 'licit') return;
         const seat = seatOf(sock);
         if (seat !== turn) return;
-        if (!b || typeof b !== 'object') return;
-        const name = players[seat].name;
-
-        if (b.type === 'bid') {
-            const level = b.level;
-            const denom = b.denom;
-            if (!Number.isInteger(level) || level < 1 || level > 7 || !DENOMS.includes(denom)) return;
-            if (highestBid !== null) { // csak magasabb licit mondhato
-                if (level < highestBid.level) return;
-                if (level === highestBid.level && DENOMS.indexOf(denom) <= DENOMS.indexOf(highestBid.denom)) return;
-            }
-            pushHistory(seat);
-            highestBid = { level: level, denom: denom, seat: seat };
-            if (firstDenom[(seat % 2) + denom] === undefined) { // ki mondta eloszor a nemet az oldalon
-                firstDenom[(seat % 2) + denom] = seat;
-            }
-            kontraLevel = 0;
-            passCount = 0;
-            io.emit('message', name + ': ' + bidText(level, denom));
-            announceBid(seat, bidText(level, denom));
-        }
-        else if (b.type === 'kontra') {
-            if (highestBid === null || kontraLevel !== 0 || (seat % 2) === (highestBid.seat % 2)) return;
-            pushHistory(seat);
-            kontraLevel = 1;
-            passCount = 0;
-            io.emit('message', name + ': Kontra');
-            announceBid(seat, 'Kontra');
-        }
-        else if (b.type === 'rekontra') {
-            if (kontraLevel !== 1 || (seat % 2) !== (highestBid.seat % 2)) return;
-            pushHistory(seat);
-            kontraLevel = 2;
-            passCount = 0;
-            io.emit('message', name + ': Rekontra');
-            announceBid(seat, 'Rekontra');
-        }
-        else if (b.type === 'passz') {
-            pushHistory(seat);
-            passCount++;
-            io.emit('message', name + ': Passz');
-            announceBid(seat, 'Passz');
-            if (highestBid !== null && passCount === 3) { // harom passz a licit utan
-                startPlay();
-                return;
-            }
-            if (highestBid === null && passCount === 4) { // mindenki passzolt
-                phase = 'vege';
-                io.emit('message', 'Mindenki passzolt, nincs jatek. Inditsatok uj partit!');
-                io.emit('turn', -1);
-                sendPlist();
-                broadcastState();
-                return;
-            }
-        }
-        else {
-            return;
-        }
-        turn = (turn + 1) % 4;
-        promptBid();
+        applyBid(seat, b);
     });
 
     //
@@ -724,29 +882,20 @@ io.on('connection', (sock) => {
         io.emit('message', players[seat].name + ' bejelentette: minden ütést visz.');
         io.emit('claimAsk', { claimerSeat: seat, claimerName: players[seat].name, needed: needed, cards: hands[seat] });
         sendUndoState();
+        needed.forEach(ns => { // a botok automatikusan elfogadjak
+            if (players[ns] && players[ns].bot) {
+                setTimeout(() => {
+                    if (claimPending !== null && players[ns] && players[ns].bot) {
+                        applyClaimAnswer(ns, true);
+                    }
+                }, BOT_DELAY + 400);
+            }
+        });
     });
 
     sock.on('claimAnswer', (accept) => {
-        if (phase !== 'jatek' || claimPending === null) return;
         const seat = seatOf(sock);
-        if (!claimPending.needed.includes(seat) || claimPending.accepted.includes(seat)) return;
-        if (!accept) { // elutasitva: folytatodik a jatek
-            io.emit('message', players[seat].name + ' nem fogadta el a bejelentést, folytatódik a játék.');
-            io.emit('claimResult', { accepted: false, name: players[seat].name });
-            claimPending = null;
-            promptPlay();
-            return;
-        }
-        claimPending.accepted.push(seat);
-        if (claimPending.accepted.length === claimPending.needed.length) { // mindenki elfogadta
-            const claimSide = claimPending.seat % 2;
-            tricks[claimSide] += 13 - trickCount;
-            io.emit('message', 'Mindenki elfogadta: a hátralévő ütéseket ' +
-                pairName(claimSide) + ' viszi.');
-            io.emit('claimResult', { accepted: true, name: players[claimPending.seat].name });
-            claimPending = null;
-            finishGame();
-        }
+        applyClaimAnswer(seat, accept);
     });
 
     sock.on('disconnect', () => {

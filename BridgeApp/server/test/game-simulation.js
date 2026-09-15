@@ -21,11 +21,13 @@ function assert(cond, msg) {
 }
 
 const serverProc = spawn('node', [path.join(__dirname, '..', 'server.js')],
-    { stdio: 'pipe', env: Object.assign({}, process.env, { PORT: PORT }) });
+    { stdio: 'pipe', env: Object.assign({}, process.env, { PORT: PORT, BOT_DELAY_MS: '25' }) });
 serverProc.stdout.on('data', d => {
     if (d.toString().includes('started on ' + PORT)) run().catch(err => finish(err));
 });
 serverProc.on('error', err => finish(err));
+serverProc.stderr.on('data', d => console.error('[SZERVER HIBA]', d.toString()));
+serverProc.on('exit', c => { if (c !== null && c !== 0) console.error('[SZERVER LEALLT] kod:', c); });
 
 function finish(err) {
     if (err) {
@@ -141,13 +143,14 @@ async function run() {
         if (win.seat !== d.winnerSeat) winnerMismatches++;
         mirrorTrick = [];
     });
-    socks.forEach(s => {
+    const attachPlayBot = (s) => { // az ujracsatlakozo socketekre is fel kell tenni
         s.on('playTurn', (data) => {
             if (!botsPlay) return;
             if (firstLeadSeat === null) firstLeadSeat = data.actingSeat;
             setTimeout(() => s.emit('playcard', data.legal[0]), 2);
         });
-    });
+    };
+    socks.forEach(attachPlayBot);
 
     console.log('1b. Uzenetkuldes...');
     const chatP = waitFor(socks[3], 'chat');
@@ -249,6 +252,7 @@ async function run() {
     assert(ro.tricks[0] + ro.tricks[1] === 13, 'a parti eredmenyet is visszakapta');
     socks[2] = cili2;
     attachBidBot(cili2);
+    attachPlayBot(cili2);
 
     console.log('10. Szek atvetele: Bela uj kapcsolattal ter vissza, mielott a regi lebomlana...');
     const oldBela = socks[1];
@@ -260,6 +264,7 @@ async function run() {
     assert(true, 'a szerver lebontotta a regi, arva kapcsolatot');
     socks[1] = bela2;
     attachBidBot(bela2);
+    attachPlayBot(bela2);
 
     console.log('11. Visszavonas, majd bejelentes: minden utest viszek...');
     // Uj parti (oszto: Denes), Denes 1 kort mond es o lesz a felvevo
@@ -306,6 +311,41 @@ async function run() {
         'a parti vegen mindenki eredeti 13 lapja lathato');
     assert(Array.isArray(rev.tricksHist) && rev.tricksHist.length === 0,
         'az uteslista is megjott (' + rev.tricksHist.length + ' lejatszott utes)');
+
+    console.log('12. Robot jatekos: Denes helyere bot ul, es vegigmegy egy parti...');
+    socks[3].emit('leave'); // Denes felall (vege fazisban szabad)
+    await new Promise((res, rej) => {
+        const t0 = Date.now();
+        const iv = setInterval(() => {
+            if (seatsNow[3] === null) { clearInterval(iv); res(); }
+            else if (Date.now() - t0 > 5000) { clearInterval(iv); rej(new Error('nem urult ki a szek')); }
+        }, 50);
+    });
+    socks[0].emit('addBot', 3);
+    await new Promise((res, rej) => {
+        const t0 = Date.now();
+        const iv = setInterval(() => {
+            if (seatsNow[3] !== null && seatsNow[3].bot) { clearInterval(iv); res(); }
+            else if (Date.now() - t0 > 5000) { clearInterval(iv); rej(new Error('nem ult le a bot')); }
+        }, 50);
+    });
+    assert(true, 'a bot leult Denes helyere (' + seatsNow[3].name + ')');
+    botsPlay = true; // az emberek automatikusan jatszanak
+    bidScript.push({ type: 'passz' }, { type: 'passz' }, { type: 'passz' },
+        { type: 'passz' }, { type: 'passz' }, { type: 'passz' });
+    let botActed = false;
+    socks[0].on('bidMade', b => { if (b.seat === 3) botActed = true; });
+    const botGameDone = new Promise((res, rej) => {
+        const t = setTimeout(() => rej(new Error('timeout: bot parti')), 30000);
+        socks[2].once('gameOver', () => { clearTimeout(t); res('lejatszva'); });
+        socks[0].on('message', (m) => {
+            if (String(m).includes('Mindenki passzolt')) { clearTimeout(t); res('korpassz'); }
+        });
+    });
+    socks[0].emit('ujparti');
+    const outcome = await botGameDone;
+    assert(botActed, 'a bot licitalt vagy passzolt a soran');
+    assert(true, 'a bot-os parti lement (' + outcome + ')');
 
     console.log(failed ? '\nVANNAK HIBAK!' : '\nMinden proba sikeres.');
     socks.forEach(s => s.close());

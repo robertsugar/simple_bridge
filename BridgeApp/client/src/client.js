@@ -194,6 +194,7 @@ function renderPlate(abs) {
     const nameSpan = document.createElement('span');
     nameSpan.className = 'pname';
     let nm = seatInfo ? seatInfo.name : '(üres hely)';
+    if (seatInfo && seatInfo.bot) nm = '\ud83e\udd16 ' + nm;
     if (seatInfo && !seatInfo.connected) nm += ' (megszakadt)';
     if (playing && abs === declarerSeat) nm = '\u2605 ' + nm;
     nameSpan.textContent = nm;
@@ -212,6 +213,15 @@ function renderPlate(abs) {
         b.onclick = () => sock.emit('sit', abs);
         plate.appendChild(b);
     }
+    if (seatInfo === null && userName) { // ures hely: robot is ultetheto
+        const b = document.createElement('button');
+        b.id = 'bot-' + abs;
+        b.className = 'seat-btn';
+        b.textContent = 'Bot';
+        b.title = 'Robot leültetése erre a helyre';
+        b.onclick = () => sock.emit('addBot', abs);
+        plate.appendChild(b);
+    }
     if (seatInfo !== null && seatInfo.name === userName && (!inGame || gameEnded)) { // felallas
         const b = document.createElement('button');
         b.id = 'stand-btn';
@@ -220,10 +230,11 @@ function renderPlate(abs) {
         b.onclick = () => sock.emit('stand');
         plate.appendChild(b);
     }
-    if (seatInfo !== null && !seatInfo.connected && myLobby >= 0) { // megszakadt jatekos kidobasa
+    if (seatInfo !== null && (!seatInfo.connected || seatInfo.bot) && myLobby >= 0) {
+        // megszakadt jatekos vagy bot eltavolitasa
         const b = document.createElement('button');
         b.className = 'seat-btn kick-btn';
-        b.textContent = 'Kidobás';
+        b.textContent = seatInfo.bot ? 'Elküld' : 'Kidobás';
         b.onclick = () => sock.emit('kick', abs);
         plate.appendChild(b);
     }

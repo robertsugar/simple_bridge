@@ -9,6 +9,9 @@ Az [albapa/ulti](https://github.com/albapa/ulti) projekt forkja.
   le egy ures helyre (É/K/D/NY); fel is allhatnak, a megszakadt jatekos
   helye felszabadithato, es oda uj jatekos ulhet - akar parti kozben is.
 - A Jatek inditasa gomb kozepen jelenik meg, ha negy jatekos ul.
+- Ures helyre robot jatekos is ultetheto (**Bot** gomb): szabaly-alapu
+  licitet (figurapont-szamolas) es lapjatekot jatszik, a bejelenteseket
+  elfogadja; barmikor elkuldheto a helyerol.
 - Mindenki 13 lapot kap egy szabvany 52 lapos francia kartyabol.
 - Teljes licitales: **1&clubs; .. 7SZ** (treff, karo, kor, pikk, szanzadu),
   **Passz**, **Kontra**, **Rekontra**. Minden licitnek magasabbnak kell lennie
