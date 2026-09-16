@@ -757,9 +757,15 @@ io.on('connection', (sock) => {
 
     sock.on('kick', (s) => {
         if (!Number.isInteger(s) || s < 0 || s > 3) return;
-        if (seatOf(sock) < 0) return; // csak ulo jatekos dobhat ki
         if (players[s] === null) return;
-        if (players[s].connected && !players[s].bot) return; // megszakadt jatekost vagy botot
+        const seated = seatOf(sock) >= 0;
+        const present = seated || spectators.some(x => x.sock === sock);
+        if (players[s].bot) {
+            if (!present) return; // botot barmely belepett (nezelodo is) elkuldhet
+        }
+        else {
+            if (!seated || players[s].connected) return; // megszakadt embert csak ulo dobhat ki
+        }
         const name = players[s].name;
         players[s] = null;
         io.emit('message', name + ' helyét felszabadították - bárki leülhet oda.');
@@ -787,8 +793,11 @@ io.on('connection', (sock) => {
             sock.emit('message', 'Négy leült játékos kell az indításhoz.');
             return;
         }
-        if (seatOf(sock) < 0) {
-            sock.emit('message', 'Új partit csak leült játékos indíthat.');
+        const seated = seatOf(sock) >= 0;
+        const present = seated || spectators.some(x => x.sock === sock);
+        const allBots = players.every(p => p !== null && p.bot);
+        if (!seated && !(allBots && present)) { // nezelodo csak akkor indithat, ha negy robot ul
+            sock.emit('message', 'Új partit csak leült játékos indíthat (kivéve, ha négy robot ül).');
             return;
         }
         if (phase === 'licit' && Date.now() - lastDealAt < 3000) return; // dupla kattintas vedelem

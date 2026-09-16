@@ -230,8 +230,8 @@ function renderPlate(abs) {
         b.onclick = () => sock.emit('stand');
         plate.appendChild(b);
     }
-    if (seatInfo !== null && (!seatInfo.connected || seatInfo.bot) && myLobby >= 0) {
-        // megszakadt jatekos vagy bot eltavolitasa
+    if (seatInfo !== null && ((seatInfo.bot && userName) || (!seatInfo.connected && !seatInfo.bot && myLobby >= 0))) {
+        // botot barki elkuldhet; megszakadt embert csak ulo jatekos dobhat ki
         const b = document.createElement('button');
         b.className = 'seat-btn kick-btn';
         b.textContent = seatInfo.bot ? 'Elküld' : 'Kidobás';
@@ -242,7 +242,9 @@ function renderPlate(abs) {
 
 function renderStartCenter() { // Jatek inditasa gomb kozepen, ha negyen ulnek
     const full = seatsState.every(x => x !== null);
-    const show = full && !inGame && lobbySeatOfMe() >= 0;
+    const allBots = full && seatsState.every(x => x.bot);
+    // ulo jatekos indithat; ha negy robot ul, barki (nezelodo is)
+    const show = full && !inGame && (lobbySeatOfMe() >= 0 || allBots);
     document.getElementById('start-center').style.display = show ? 'block' : 'none';
 }
 

@@ -347,6 +347,41 @@ async function run() {
     assert(botActed, 'a bot licitalt vagy passzolt a soran');
     assert(true, 'a bot-os parti lement (' + outcome + ')');
 
+    console.log('13. Nezelodo: bot elkuldese, visszaultetese, majd inditas 4 bottal...');
+    const nezo = await connectPlayer('Nezo');
+    const waitSeats = (cond, mit) => new Promise((res, rej) => {
+        const t0 = Date.now();
+        const iv = setInterval(() => {
+            if (cond()) { clearInterval(iv); res(); }
+            else if (Date.now() - t0 > 5000) { clearInterval(iv); rej(new Error('timeout: ' + mit)); }
+        }, 50);
+    });
+    nezo.emit('kick', 3); // nezelodo elkuldi a botot
+    await waitSeats(() => seatsNow[3] === null, 'bot elkuldese nezelodokent');
+    assert(true, 'nezelodo elkuldte a botot');
+    nezo.emit('addBot', 3); // es vissza is ulteti
+    await waitSeats(() => seatsNow[3] !== null && seatsNow[3].bot, 'bot visszaultetese');
+    assert(true, 'nezelodo visszaultette a botot');
+    // A harom ember felall (vege fazisban szabad), a helyukre botok ulnek
+    [socks[0], socks[1], socks[2]].forEach(s => s.emit('stand'));
+    await waitSeats(() => [0, 1, 2].every(i => seatsNow[i] === null), 'emberek felallasa');
+    [0, 1, 2].forEach(i => nezo.emit('addBot', i));
+    await waitSeats(() => seatsNow.every(x => x !== null && x.bot), 'negy bot leultetese');
+    assert(true, 'mind a negy helyen bot ul');
+    const botGame2Done = new Promise((res, rej) => {
+        const t = setTimeout(() => rej(new Error('timeout: 4 botos parti')), 30000);
+        nezo.once('gameOver', () => { clearTimeout(t); res('lejatszva'); });
+        nezo.on('message', (m) => {
+            if (String(m).includes('Mindenki passzolt')) { clearTimeout(t); res('korpassz'); }
+        });
+    });
+    const nezoDeal = waitFor(nezo, 'deal', 5000);
+    nezo.emit('ujparti'); // nezelodo indit, mert negy bot ul
+    const nd = await nezoDeal;
+    assert(nd.seat === -1, 'a nezelodo inditasara elindult a parti (nezelodo osztast kapott)');
+    const outcome2 = await botGame2Done;
+    assert(true, 'a negy bot vegigjatszotta a partit (' + outcome2 + ')');
+
     console.log(failed ? '\nVANNAK HIBAK!' : '\nMinden proba sikeres.');
     socks.forEach(s => s.close());
     finish();
