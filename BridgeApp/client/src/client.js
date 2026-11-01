@@ -20,6 +20,7 @@ let dummySeat = -1;
 let dummyCards = [];
 let partnerSeat = -1;   // ha en vagyok az asztal: a felvevo szeke
 let partnerCards = [];  // es a felvevo lapjai
+let specHands = null;   // nezelodonek: mind a negy kez (szek szerint)
 let declarerSeat = -1;
 let turnSeat = -1;
 let playing = false;    // licit kozben false, lejatszas alatt true
@@ -37,7 +38,6 @@ let undoActor = -1;     // ki vonhatja vissza az utolso lepest
 let gameEnded = false;  // lezarult-e az aktualis parti
 let pendingReveal = null;
 let trickZ = 1;
-let leftSeat = -1;   // az eppen kiesett jatekos szeke
 // Az asztal megjelenitesi sora: a teljes utes par masodpercig latszik,
 // a kozben kijatszott lapok megvarjak, mig a gyoztes elviszi oket
 let tableQueue = [];
@@ -170,6 +170,9 @@ function renderFan(abs) {
         fan.classList.add('fan-full');
         customSort(partnerCards, suitOrderH()).forEach(card => fan.appendChild(cardEl(card)));
     }
+    else if (specHands !== null) { // nezelodo: mindenki lapja felforditva
+        fillOpenFan(fan, slotOf(abs), specHands[abs]);
+    }
     else { // hatlapok
         for (let i = 0; i < handCounts[abs]; i++) {
             fan.appendChild(backEl());
@@ -231,10 +234,10 @@ function renderPlate(abs) {
         plate.appendChild(b);
     }
     if (seatInfo !== null && ((seatInfo.bot && userName) || (!seatInfo.connected && !seatInfo.bot && myLobby >= 0))) {
-        // botot barki elkuldhet; megszakadt embert csak ulo jatekos dobhat ki
+        // botot barki elkuldhet; megszakadt embert csak ulo jatekos kuldhet el
         const b = document.createElement('button');
         b.className = 'seat-btn kick-btn';
-        b.textContent = seatInfo.bot ? 'Elküld' : 'Kidobás';
+        b.textContent = 'Elküld';
         b.onclick = () => sock.emit('kick', abs);
         plate.appendChild(b);
     }
@@ -360,7 +363,8 @@ function pumpTable() {
         pumpTable();
         return;
     }
-    // teljes utes: par masodpercig mozdulatlanul latszik, aztan a gyoztes elviszi
+    // teljes utes: par masodpercig mozdulatlanul latszik, aztan a gyoztes elviszi;
+    // az utolso utes tovabb marad
     tableBusy = true;
     const gen = tableGen;
     setTimeout(() => {
@@ -376,7 +380,7 @@ function pumpTable() {
             tableBusy = false;
             pumpTable();
         }, 900);
-    }, 2000);
+    }, ev.last ? 5000 : 2000);
 }
 
 function playCard(card) {
@@ -473,6 +477,7 @@ function resetGameView() {
     dummyCards = [];
     partnerSeat = -1;
     partnerCards = [];
+    specHands = null;
     declarerSeat = -1;
     turnSeat = -1;
     playing = false;
@@ -495,7 +500,6 @@ function resetGameView() {
     gameEnded = false;
     pendingReveal = null;
     hideDiv('confirm-modal');
-    hideDiv('left-modal');
     renderSeats();
     renderBidHistory();
     renderTrickHistory();
@@ -607,15 +611,6 @@ document.getElementById('leave-no').addEventListener('click', (e) => {
     e.preventDefault();
     hideDiv('leave-modal');
 });
-document.getElementById('left-wait').addEventListener('click', (e) => {
-    e.preventDefault();
-    hideDiv('left-modal');
-});
-document.getElementById('left-ujparti').addEventListener('click', (e) => {
-    e.preventDefault();
-    hideDiv('left-modal');
-    sock.emit('ujparti');
-});
 document.getElementById('chat-form').addEventListener('submit', onChatSubmit);
 document.getElementById('ujparti-butt').addEventListener('click', onUjParti);
 document.getElementById('result-ujparti').addEventListener('click', (e) => {
@@ -667,28 +662,23 @@ const onEntrySubmitted = (e) => {
         });
         sock.on('seats', (arr) => { // ulesek allapota (lobby es jatek kozben is)
             seatsState = arr;
+            // ki- es beulesnel a nevek a licittablaban es a bal oldalon is frissulnek
+            names = arr.map(x => x ? x.name : '(üres hely)');
+            renderBidHistory();
+            renderInfo();
             renderSeats();
             renderStartCenter();
-            if (leftSeat >= 0 && seatsState[leftSeat] && seatsState[leftSeat].connected) {
-                hideDiv('left-modal'); // a kieso visszatert
-                leftSeat = -1;
-            }
         });
         sock.on('undoState', (d) => { // ki vonhatja vissza az utolso lepest
             undoActor = d.actor;
             renderUndo();
-        });
-        sock.on('playerLeft', (d) => { // jatekos esett ki vagy lepett ki a parti kozben
-            leftSeat = d.seat;
-            document.getElementById('left-title').innerText =
-                d.name + (d.left ? ' kilépett a játékból.' : ' kapcsolata megszakadt.');
-            showDiv('left-modal', 'flex');
         });
         sock.on('deal', (data) => { // uj parti, osztas
             resetGameView();
             inGame = true;
             mySeat = data.seat;
             myHand = data.cards;
+            specHands = data.allHands ? data.allHands.map(h => h.slice()) : null;
             names = data.names;
             dealer = data.dealer;
             gameNo = data.gameNo || gameNo + 1;
@@ -747,12 +737,15 @@ const onEntrySubmitted = (e) => {
             if (data.seat === mySeat) {
                 myHand = myHand.filter(c => c !== data.card);
             }
+            if (specHands !== null) {
+                specHands[data.seat] = specHands[data.seat].filter(c => c !== data.card);
+            }
             enqueueTable({ type: 'card', seat: data.seat, card: data.card });
             renderSeats();
         });
         sock.on('trickDone', (data) => {
             tricksPair = data.tricks;
-            enqueueTable({ type: 'trickEnd', winnerSeat: data.winnerSeat });
+            enqueueTable({ type: 'trickEnd', winnerSeat: data.winnerSeat, last: data.tricks[0] + data.tricks[1] === 13 });
             renderSeats();
             renderInfo();
         });
@@ -766,9 +759,14 @@ const onEntrySubmitted = (e) => {
             renderSeats();
             renderInfo();
             renderUndo();
-            // Az utolso utes es az animacio meg latsszon: kis kesleltetes
-            setTimeout(() => {
+            // Az utolso utes es az animacio meg latsszon: kis kesleltetes,
+            // utana megvarja, hogy az asztalon levo utesek elfogyjanak
+            const showResult = () => {
                 if (!gameEnded) return; // kozben uj parti indult
+                if (tableBusy || tableQueue.length > 0) {
+                    setTimeout(showResult, 200);
+                    return;
+                }
                 if (pendingReveal) { // mindenki lapja es az utesek
                     revealHands = pendingReveal.hands;
                     trickHist = pendingReveal.tricksHist;
@@ -787,7 +785,8 @@ const onEntrySubmitted = (e) => {
                         '<div>Eredmény: <b>' + diffTxt + '</b></div>';
                     showDiv('result-modal', 'flex');
                 }
-            }, 3300);
+            };
+            setTimeout(showResult, 3300);
         });
         sock.on('claimAsk', (d) => { // valaki bejelentette: minden utest visz
             claimSeat = d.claimerSeat;

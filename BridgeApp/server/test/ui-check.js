@@ -239,6 +239,54 @@ async function clickWhenVisible(page, sel, timeout) {
     });
     assert(true, 'az eredmenyablak eltunik az Uj partira, es uj osztas jon');
 
+    // Nezelodo (kibic): mind a negy kez felforditva latszik
+    const ctxE = await browser.createBrowserContext();
+    const erik = await ctxE.newPage();
+    await erik.setViewport({ width: 1400, height: 900 });
+    erik.on('pageerror', e => errors.push('Erik: ' + e.message));
+    await erik.goto(URL);
+    await erik.type('#name', 'Erik');
+    await erik.click('#enter');
+    await erik.waitForFunction(() => document.querySelectorAll('.fan .card').length === 52);
+    const specBacks = await erik.evaluate(() => document.querySelectorAll('.cardback').length);
+    assert(specBacks === 0, 'a nezelodo mind a 4 kez 52 lapjat latja, hatlap nelkul (' + specBacks + ')');
+    await pages[0].waitForFunction(() =>
+        document.getElementById('player-list').innerText.includes('Erik (kibic)'));
+    assert(true, 'a jatekoslistaban a nezelodo neve mellett "(kibic)" all');
+    await erik.screenshot({ path: OUT + '/ui-7-kibic.png' });
+
+    // Kilepes jatek kozben: a neve eltunik a licittablabol, az uj jatekos neve bekerul
+    const headerK = () => pages[0].evaluate(() =>
+        document.querySelectorAll('#bid-history th')[1].innerText.replace(/\s+/g, ' ').trim());
+    await clickWhenVisible(pages[1], '#leave-butt');
+    await clickWhenVisible(pages[1], '#leave-yes');
+    await pages[0].waitForFunction(() =>
+        !document.querySelectorAll('#bid-history th')[1].innerText.includes('Bela'));
+    assert(true, 'kilepes utan a licittabla fejleceben nincs a regi nev (' + await headerK() + ')');
+    const modals = await pages[0].evaluate(() =>
+        Array.from(document.querySelectorAll('[id$="-modal"]')).filter(m => getComputedStyle(m).display !== 'none').length);
+    assert(modals === 0, 'kilepeskor nem ugrik fel ablak (' + modals + ')');
+    await clickWhenVisible(erik, '#sit-1');
+    await pages[0].waitForFunction(() =>
+        document.querySelectorAll('#bid-history th')[1].innerText.includes('Erik'));
+    assert(true, 'az uj jatekos neve bekerul a licittablaba (' + await headerK() + ')');
+
+    // Megszakadt kapcsolat: csak jel a nevtablan es Elkuld gomb; elkuldes utan bot ulhet oda
+    await ctxE.close();
+    await pages[0].waitForFunction(() =>
+        document.getElementById('plateR1').innerText.includes('megszakadt'));
+    const modals2 = await pages[0].evaluate(() =>
+        Array.from(document.querySelectorAll('[id$="-modal"]')).filter(m => getComputedStyle(m).display !== 'none').length);
+    assert(modals2 === 0, 'megszakadt kapcsolatnal csak jel latszik, nem ugrik fel ablak (' + modals2 + ')');
+    const kickText = await pages[0].$eval('#plateR1 .kick-btn', b => b.innerText);
+    assert(kickText === 'Elküld', 'a megszakadt jatekos mellett Elkuld gomb van (' + kickText + ')');
+    await pages[0].screenshot({ path: OUT + '/ui-8-megszakadt.png' });
+    await pages[0].click('#plateR1 .kick-btn');
+    await clickWhenVisible(pages[0], '#bot-1');
+    await pages[0].waitForFunction(() =>
+        document.getElementById('plateR1').innerText.includes('bot'));
+    assert(true, 'elkuldes utan bot ult a helyere (' + await pages[0].$eval('#plateR1 .pname', el => el.innerText) + ')');
+
     assert(errors.length === 0, 'nincs JS hiba a kliensben' + (errors.length ? ': ' + errors.join(' | ') : ''));
 
     await browser.close();

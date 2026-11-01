@@ -117,8 +117,8 @@ body {
 
 /* Kartyak BBO stilusban: feher lap, a szam es a szin kitolti a lapot */
 .card {
-    width: 96px;
-    height: 142px;
+    width: 82px;
+    height: 121px;
     background-color: white;
     border: 1px solid #888888;
     border-radius: 8px;
@@ -133,11 +133,11 @@ body {
 }
 .card .rank {
     font-weight: bold;
-    font-size: 52px;
+    font-size: 44px;
     line-height: 1;
 }
 .card .suit {
-    font-size: 52px;
+    font-size: 44px;
     line-height: 1;
 }
 .card.red {
@@ -155,12 +155,12 @@ body {
     opacity: 0.45;
 }
 .cardback {
-    width: 42px;
-    height: 118px;
+    width: 36px;
+    height: 100px;
     background-color: #2b7a8c;
     border: 2px solid white;
     border-radius: 6px;
-    margin-left: -26px;
+    margin-left: -22px;
     flex-shrink: 0;
     box-sizing: border-box;
 }
@@ -180,7 +180,7 @@ body {
     min-height: 0;
 }
 .dummy-fan .card {
-    margin-left: -56px;
+    margin-left: -48px;
 }
 .dummy-fan .card:first-child {
     margin-left: 0;
@@ -192,14 +192,14 @@ body {
     padding: 3px 0 0 6px;
 }
 .dummy-vert .card .rank, .dummy-vert .card .suit {
-    font-size: 34px;
+    font-size: 29px;
 }
 /* Oldalso teritett kez: szinenkent kulon sor, fuggolegesen atlapolva */
 .dummy-vert {
     flex-direction: column;
 }
 .dummy-vert .card {
-    margin-left: -56px;
+    margin-left: -48px;
 }
 .dummy-vert .card:first-child {
     margin-left: 0;
@@ -208,17 +208,17 @@ body {
     display: flex;
 }
 .dummy-vert .suit-row + .suit-row {
-    margin-top: -62px; /* a felso 80px latszik: nagy szam+szin elfer */
+    margin-top: -53px; /* a felso 68px latszik: nagy szam+szin elfer */
 }
-/* Sajat kez: 13 lappal pont a jatekter szeleig er, a lapmeret utana is
-   ugyanez marad, kevesebb lapnal kozepre rendezve */
+/* Sajat kez: 13 lappal a jatekter szelessegenek kb. 85%-at foglalja, a
+   lapmeret utana is ugyanez marad, kevesebb lapnal kozepre rendezve */
 .own-fan, .fan-full {
     width: 100%;
     justify-content: center;
 }
 .own-fan .card, .fan-full .card {
     flex: 0 0 auto;
-    width: calc((100vw - 260px) / 13);
+    width: calc((100vw - 260px) / 13 * 0.85);
     height: auto;
     aspect-ratio: 27 / 40;
     margin-left: -1px;
@@ -228,7 +228,7 @@ body {
 }
 .own-fan .card .rank, .fan-full .card .rank,
 .own-fan .card .suit, .fan-full .card .suit {
-    font-size: clamp(32px, 3.6vw, 64px);
+    font-size: clamp(27px, 3.06vw, 54px);
 }
 
 /* Nevtabla: ulesbetu + nev + utesszam, sarga ha o jon */
@@ -360,13 +360,13 @@ body {
     pointer-events: none;
 }
 .trick-pos .card {
-    width: calc((100vw - 260px) / 13); /* akkora, mint a kez lapjai */
+    width: calc((100vw - 260px) / 13 * 0.85); /* akkora, mint a kez lapjai */
     height: auto;
     aspect-ratio: 27 / 40;
     box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.35);
 }
 .trick-pos .card .rank, .trick-pos .card .suit {
-    font-size: clamp(32px, 3.6vw, 64px);
+    font-size: clamp(27px, 3.06vw, 54px);
 }
 #trickR0 { left: 25%; right: 25%; bottom: 3%; height: 55%; align-items: flex-end; }
 #trickR2 { left: 25%; right: 25%; top: 3%; height: 55%; align-items: flex-start; }
@@ -544,7 +544,7 @@ body {
 }
 
 /* Megerosites (Uj parti) es kieses ablakok */
-#confirm-modal, #left-modal, #leave-modal {
+#confirm-modal, #leave-modal {
     display: none;
     position: fixed;
     top: 0;
@@ -556,7 +556,7 @@ body {
     justify-content: center;
     z-index: 120;
 }
-#confirm-box, #left-box, #leave-box {
+#confirm-box, #leave-box {
     background-color: white;
     border: 3px solid #7a5c00;
     border-radius: 12px;
@@ -566,15 +566,15 @@ body {
     color: black;
     max-width: 560px;
 }
-#confirm-title, #left-title, #leave-title {
+#confirm-title, #leave-title {
     font-size: 27px;
     font-weight: bold;
     margin-bottom: 14px;
 }
-#left-text, #leave-text {
+#leave-text {
     margin-bottom: 14px;
 }
-#confirm-buttons button, #left-buttons button, #leave-buttons button {
+#confirm-buttons button, #leave-buttons button {
     margin: 4px 8px;
     padding: 12px 26px;
     font-size: 21px;

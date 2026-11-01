@@ -112,7 +112,7 @@ function sendPlist() { // jatekos lista kikuldese, jelolve kinek a kore van
         if ((phase === 'licit' || phase === 'jatek') && i === turn) n = '&gt; ' + n;
         rows.push(n);
     });
-    spectators.forEach(s => rows.push(s.name + ' (nézelődő)'));
+    spectators.forEach(s => rows.push(s.name + ' (kibic)'));
     io.emit('plist', rows.join('<br/>'));
 }
 
@@ -361,7 +361,8 @@ function newGame() {
         players[i].sock.emit('deal', { seat: i, cards: hands[i], dealer: dealer, names: names, gameNo: gameNo });
     }
     initialHands = hands.map(h => h.slice()); // a parti vegi felfedeshez
-    spectators.forEach(s => s.sock.emit('deal', { seat: -1, cards: [], dealer: dealer, names: names, gameNo: gameNo }));
+    // a nezelodo (kibic) mindenki lapjat latja
+    spectators.forEach(s => s.sock.emit('deal', { seat: -1, cards: [], dealer: dealer, names: names, gameNo: gameNo, allHands: hands }));
     turn = dealer;
     io.emit('message', '--- Új parti, ' + players[dealer].name + ' kezdi a licitet ---');
     dealer = (dealer + 1) % 4;
@@ -376,7 +377,8 @@ function resync(seat, sock) {
     currentTrick.forEach(t => sendCounts[t.seat]++); // az asztalon levo lapokat ujra "kijatsszuk"
     sock.emit('deal', {
         seat: seat, cards: seat >= 0 ? hands[seat] : [], dealer: currentDealer, names: names,
-        gameNo: gameNo, counts: sendCounts, tricks: tricks
+        gameNo: gameNo, counts: sendCounts, tricks: tricks,
+        allHands: seat < 0 ? hands : undefined // a nezelodo mindenki lapjat latja
     });
     bidsLog.forEach(b => sock.emit('bidMade', b));
     if (declarer !== null && (phase === 'jatek' || phase === 'vege')) {
@@ -629,9 +631,6 @@ function dropPlayer(sock) {
             // vagy a tobbiek kidobhatjak es mas ulhet a helyere
             players[seat].connected = false;
             io.emit('message', name + ' kapcsolata megszakadt - ugyanazzal a névvel belépve folytathatja.');
-            if (phase === 'licit' || phase === 'jatek') {
-                io.emit('playerLeft', { seat: seat, name: name });
-            }
         }
         else {
             players[seat] = null; // a lobbyban a hely felszabadul
@@ -726,9 +725,6 @@ io.on('connection', (sock) => {
             const name = players[seat].name;
             players[seat] = null;
             io.emit('message', name + ' kilépett a játékból.');
-            if (phase === 'licit' || phase === 'jatek') {
-                io.emit('playerLeft', { seat: seat, name: name, left: true });
-            }
         }
         else {
             const spec = spectators.find(x => x.sock === sock);
