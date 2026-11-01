@@ -1,6 +1,7 @@
 const http = require('http');
 const express = require('express');
 const socketio = require('socket.io');
+const { vulnerability, dealScore } = require('./scoring');
 
 const app = express();
 
@@ -66,6 +67,11 @@ let trickHistory = [];     // {cards: [{seat, card}...], winnerSeat} minden utes
 let lastReveal = null;     // a parti vegi felfedes (ujracsatlakozashoz)
 let claimPending = null;   // {seat, needed: [szekek], accepted: [szekek]}
 let history = [];          // visszavonashoz: {snap, actor} minden akcio elott
+// Chicago kor: 4 leosztas; a pontok a ket ules-vonalhoz (0-2, 1-3) tartoznak.
+// Az oszto csak lezart leosztas utan lep tovabb (korpassznal, felbehagyott
+// partinal ugyanaz oszt ujra, a leosztas sorszama marad)
+let chicago = { round: 1, dealNo: 1, rows: [], roundTotal: [0, 0], total: [0, 0] };
+let vul = [false, false];  // a futo leosztas szkorhelyzete: [0-2 bellben, 1-3 bellben]
 
 function shuffle(arr) {
     var ctr = arr.length, temp, index;
@@ -271,10 +277,36 @@ function resyncAll() { // teljes ujraszinkronizalas mindenkinek (visszavonas uta
     spectators.forEach(s => resync(-1, s.sock));
 }
 
+function chicagoState() { // a kliensnek: kor, leosztas, szkorhelyzet, eredmenylap
+    return {
+        round: chicago.round, dealNo: chicago.dealNo, vul: vul,
+        rows: chicago.rows, roundTotal: chicago.roundTotal, total: chicago.total
+    };
+}
+
+function scoreDeal() { // a lezart leosztas pontjai a Chicago eredmenylapra
+    const declSide = declarer % 2;
+    const score = dealScore(contract.level, contract.denom, kontraLevel, vul[declSide], tricks[declSide]);
+    const pts = [0, 0]; // a pont a teljesito felvevo vonalnak vagy a buktato ellenvonalnak jar
+    if (score >= 0) pts[declSide] = score;
+    else pts[1 - declSide] = -score;
+    chicago.rows.push({
+        dealNo: chicago.dealNo, vul: vul.slice(), level: contract.level, denom: contract.denom,
+        kontraLevel: kontraLevel, declarerSeat: declarer, diff: tricks[declSide] - 6 - contract.level, pts: pts
+    });
+    for (let i = 0; i < 2; i++) {
+        chicago.roundTotal[i] += pts[i];
+        chicago.total[i] += pts[i];
+    }
+    dealer = (currentDealer + 1) % 4; // lezart leosztas: a kovetkezo jatekos oszt
+    return pts;
+}
+
 function finishGame() { // parti vege: eredmeny + minden lap es az utesek felfedese
     phase = 'vege';
     const declSide = declarer % 2;
     const needed = 6 + contract.level;
+    const pts = scoreDeal();
     const result = tricks[declSide] >= needed
         ? 'teljesítette a bemondást (' + tricks[declSide] + ' ütés, kellett: ' + needed + ')'
         : 'elbukta a bemondást (' + tricks[declSide] + ' ütés, kellett: ' + needed + ')';
@@ -292,11 +324,15 @@ function finishGame() { // parti vege: eredmeny + minden lap es az utesek felfed
         declarerName: nameOf(declarer),
         declTricks: tricks[declSide],
         needed: needed,
-        diff: tricks[declSide] - needed
+        diff: tricks[declSide] - needed,
+        pts: pts,
+        roundOver: chicago.rows.length === 4,
+        roundTotal: chicago.roundTotal
     };
     lastReveal = { hands: initialHands, tricksHist: trickHistory };
     io.emit('reveal', lastReveal);
     io.emit('gameOver', lastGameOver);
+    io.emit('chicago', chicagoState());
     io.emit('turn', -1);
     sendUndoState(); // vege: nincs tobb visszavonas
     sendPlist();
@@ -354,6 +390,13 @@ function newGame() {
     lastDealAt = Date.now();
     gameNo++;
     currentDealer = dealer;
+    if (chicago.rows.length === 4) { // a 4. leosztas utan uj kor indul
+        chicago.round++;
+        chicago.rows = [];
+        chicago.roundTotal = [0, 0];
+    }
+    chicago.dealNo = chicago.rows.length + 1;
+    vul = vulnerability(chicago.dealNo, dealer);
     const deck = shuffle(DECK.slice());
     const names = players.map(p => p === null ? '?' : p.name);
     for (let i = 0; i < 4; i++) {
@@ -364,8 +407,8 @@ function newGame() {
     // a nezelodo (kibic) mindenki lapjat latja
     spectators.forEach(s => s.sock.emit('deal', { seat: -1, cards: [], dealer: dealer, names: names, gameNo: gameNo, allHands: hands }));
     turn = dealer;
+    io.emit('chicago', chicagoState());
     io.emit('message', '--- Új parti, ' + players[dealer].name + ' kezdi a licitet ---');
-    dealer = (dealer + 1) % 4;
     promptBid();
 }
 
@@ -380,6 +423,7 @@ function resync(seat, sock) {
         gameNo: gameNo, counts: sendCounts, tricks: tricks,
         allHands: seat < 0 ? hands : undefined // a nezelodo mindenki lapjat latja
     });
+    sock.emit('chicago', chicagoState());
     bidsLog.forEach(b => sock.emit('bidMade', b));
     if (declarer !== null && (phase === 'jatek' || phase === 'vege')) {
         sock.emit('contract', {

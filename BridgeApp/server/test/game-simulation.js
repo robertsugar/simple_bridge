@@ -4,6 +4,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const ioc = require('socket.io-client');
+const { dealScore } = require('../scoring');
 
 const PORT = process.env.TEST_PORT || '8010';
 const URL = 'http://localhost:' + PORT;
@@ -160,6 +161,7 @@ async function run() {
         'az uzenet nevvel egyutt mindenkihez eljut');
 
     console.log('2. Parti inditasa...');
+    const chicago1P = waitFor(socks[0], 'chicago');
     socks[0].emit('ujparti');
     const hands = {};
     for (let i = 0; i < 4; i++) {
@@ -170,6 +172,9 @@ async function run() {
     }
     const all = Object.values(hands).flat();
     assert(new Set(all).size === 52, 'mind az 52 lap kulonbozo');
+    const ch1 = await chicago1P;
+    assert(ch1.round === 1 && ch1.dealNo === 1 && !ch1.vul[0] && !ch1.vul[1],
+        'Chicago: 1. kor 1. leosztas, altalanos mans');
 
     console.log('4. Licitalas: 1C, 1H, 2H, kontra, rekontra, majd harom passz...');
     releaseBidding();
@@ -202,13 +207,22 @@ async function run() {
     assert(winnerMismatches === 0, 'minden utest a szabalyok szerinti gyoztes vitt (adu: kor)');
     assert(over.needed === 8 && over.diff === over.declTricks - 8 && over.declTricks === over.tricks[0],
         'gameOver: bemondas adatok (kellett: ' + over.needed + ', vitt: ' + over.declTricks + ', eredmeny: ' + over.diff + ')');
+    const sc1 = dealScore(2, 'H', 2, false, over.declTricks); // 2 kor rekontrazva, mansban, felvevo: 0-2 vonal
+    assert(JSON.stringify(over.pts) === JSON.stringify(sc1 >= 0 ? [sc1, 0] : [0, -sc1]),
+        'Chicago: a leosztas pontja a megfelelo vonalnal (' + over.pts.join(' - ') + ')');
 
     console.log('6. Uj parti a jatek vege utan...');
     const redeal = waitFor(socks[2], 'deal');
+    const chicago2P = waitFor(socks[0], 'chicago');
     bidScript.push({ type: 'passz' }, { type: 'passz' }, { type: 'passz' }, { type: 'passz' }); // a masodik partit mindenki eldobja
     socks[1].emit('ujparti');
     const d2 = await redeal;
     assert(d2.cards.length === 13, 'ujraosztas is mukodik');
+    const ch2 = await chicago2P;
+    assert(ch2.dealNo === 2 && d2.dealer === 1 && !ch2.vul[0] && ch2.vul[1],
+        'Chicago: 2. leosztas, K oszt, K-NY bellben');
+    assert(ch2.rows.length === 1 && ch2.roundTotal[0] + ch2.roundTotal[1] > 0,
+        'Chicago: az eredmenylapon az 1. leosztas sora (' + ch2.roundTotal.join(' - ') + ')');
 
     console.log('7. Korpassz: mindenki passzol...');
     const allPassMsg = new Promise((res, rej) => {
@@ -225,9 +239,13 @@ async function run() {
     // a harmadik parti 3SZ, es auto fejezi be
     bidScript.push({ type: 'bid', level: 3, denom: 'N' }, { type: 'passz' }, { type: 'passz' }, { type: 'passz' });
     botsPlay = false;
+    const chicago3P = waitFor(socks[0], 'chicago');
     socks[0].emit('ujparti');
     const d3 = await redeal2;
     assert(d3.cards.length === 13, 'korpassz utan is indithato uj parti');
+    const ch3 = await chicago3P;
+    assert(ch3.dealNo === 2 && d3.dealer === 1 && ch3.rows.length === 1,
+        'Chicago: korpassz utan ugyanaz oszt ujra, a leosztas sorszama marad (2.)');
 
     console.log('8. Auto befejezes: a szerver jatssza vegig a partit...');
     const contract3 = await waitFor(socks[0], 'contract', 10000);
@@ -267,8 +285,9 @@ async function run() {
     attachPlayBot(bela2);
 
     console.log('11. Visszavonas, majd bejelentes: minden utest viszek...');
-    // Uj parti (oszto: Denes), Denes 1 kort mond es o lesz a felvevo
-    bidScript.push({ type: 'bid', level: 1, denom: 'H' }, { type: 'passz' }, { type: 'passz' }, { type: 'passz' });
+    // Uj parti (oszto: Cili - korpassz utan ugyanaz osztott ujra), Cili passzol,
+    // Denes 1 kort mond es o lesz a felvevo
+    bidScript.push({ type: 'passz' }, { type: 'bid', level: 1, denom: 'H' }, { type: 'passz' }, { type: 'passz' }, { type: 'passz' });
     let lastUndoActor = -1;
     socks[0].on('undoState', d => { lastUndoActor = d.actor; });
     const deal5 = waitFor(socks[0], 'deal');

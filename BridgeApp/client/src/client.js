@@ -21,6 +21,7 @@ let dummyCards = [];
 let partnerSeat = -1;   // ha en vagyok az asztal: a felvevo szeke
 let partnerCards = [];  // es a felvevo lapjai
 let specHands = null;   // nezelodonek: mind a negy kez (szek szerint)
+let chicago = null;     // {round, dealNo, vul, rows, roundTotal, total} a szervertol
 let declarerSeat = -1;
 let turnSeat = -1;
 let playing = false;    // licit kozben false, lejatszas alatt true
@@ -83,6 +84,17 @@ function backEl() {
     const el = document.createElement('div');
     el.className = 'cardback';
     return el;
+}
+
+function vulOf(seat) { // bellben van-e a szek vonala a futo leosztasban
+    return chicago !== null && chicago.vul[seat % 2];
+}
+
+function vulText(v) { // szkorhelyzet szovegesen
+    if (v[0] && v[1]) return 'általános bell';
+    if (v[0]) return 'É-D bellben';
+    if (v[1]) return 'K-NY bellben';
+    return 'általános mans';
 }
 
 function slotOf(seat) { // sajat szek alul (0), tovabbi szekek balra (1), szemben (2), jobbra (3)
@@ -191,6 +203,8 @@ function renderPlate(abs) {
     const seatInfo = seatsState[abs];
     plate.classList.toggle('onturn', inGame && !gameEnded && turnSeat === abs);
     plate.classList.toggle('empty-seat', seatInfo === null);
+    plate.classList.toggle('vul', inGame && vulOf(abs)); // bellben: piros ulesbetu
+    plate.title = inGame && chicago !== null ? (vulOf(abs) ? 'Bellben' : 'Mansban') : '';
     const badge = document.createElement('span');
     badge.className = 'badge';
     badge.textContent = SEAT_LETTERS[abs];
@@ -277,8 +291,8 @@ function renderBidHistory() { // licitmenet tablazat a kozepso asztalon
 
 function bidTableHtml() { // a licitmenet tablazata (kozepen es bal oldalt is)
     let html = '<table><tr>';
-    SEAT_LETTERS.forEach((l, i) => { // egtaj + alatta a jatekos neve
-        html += '<th>' + l + '<span class="th-name">' + (names[i] || '') + '</span></th>';
+    SEAT_LETTERS.forEach((l, i) => { // egtaj + alatta a jatekos neve; bellben piros
+        html += '<th' + (vulOf(i) ? ' class="vul"' : '') + '>' + l + '<span class="th-name">' + (names[i] || '') + '</span></th>';
     });
     html += '</tr>';
     const cells = [];
@@ -408,13 +422,23 @@ function renderInfo() { // bal oldali nagy betus jatekinfo
     const p = document.getElementById('info-parti');
     const b = document.getElementById('info-bemondas');
     const u = document.getElementById('info-utesek');
+    const sz = document.getElementById('info-szkor');
+    renderScoreSheet();
     if (!inGame) {
         p.innerText = '';
+        sz.innerHTML = '';
         b.innerHTML = '';
         u.innerHTML = '';
         return;
     }
-    p.innerText = gameNo + '. parti';
+    if (chicago !== null) {
+        p.innerText = chicago.round + '. kör – ' + chicago.dealNo + '/4. leosztás';
+        sz.innerHTML = 'Szkórhelyzet: <b>' + vulText(chicago.vul) + '</b>';
+    }
+    else {
+        p.innerText = gameNo + '. parti';
+        sz.innerHTML = '';
+    }
     if (contractInfo) { // a bemondas ket sorban, nagyon nagy betukkel
         b.innerHTML = '<div class="big-bid">' + contractInfo.level + DENOM_LABELS[contractInfo.denom] +
             '<span class="big-kontra">' + kontraLabel(contractInfo.kontraLevel) + '</span></div>' +
@@ -440,6 +464,31 @@ function renderInfo() { // bal oldali nagy betus jatekinfo
     }
     const lic = document.getElementById('info-licit');
     lic.innerHTML = (playing && bids.length > 0) ? 'Licitmenet:' + bidTableHtml() : '';
+}
+
+function renderScoreSheet() { // Chicago eredmenylap a bal oldalon: a kor leosztasai es az osszegek
+    const el = document.getElementById('info-chicago');
+    if (!inGame || chicago === null || (chicago.rows.length === 0 && chicago.round === 1)) {
+        el.innerHTML = '';
+        return;
+    }
+    const vulShort = v => v[0] && v[1] ? 'mind' : (v[0] ? 'É-D' : (v[1] ? 'K-NY' : '–'));
+    let html = 'Eredménylap (' + chicago.round + '. kör):<table><tr><th>#</th><th>Bell</th>' +
+        '<th>Felvétel</th><th>Ered.</th><th>É-D</th><th>K-NY</th></tr>';
+    chicago.rows.forEach(r => {
+        const k = r.kontraLevel === 1 ? 'X' : (r.kontraLevel === 2 ? 'XX' : '');
+        const diff = r.diff === 0 ? '=' : (r.diff > 0 ? '+' + r.diff : String(r.diff));
+        html += '<tr><td>' + r.dealNo + '</td><td>' + vulShort(r.vul) + '</td><td>' +
+            r.level + DENOM_LABELS[r.denom] + k + ' ' + SEAT_LETTERS[r.declarerSeat] + '</td><td>' + diff +
+            '</td><td>' + (r.pts[0] || '') + '</td><td>' + (r.pts[1] || '') + '</td></tr>';
+    });
+    html += '<tr class="sum"><td colspan="4">Kör összesen</td><td>' + chicago.roundTotal[0] +
+        '</td><td>' + chicago.roundTotal[1] + '</td></tr>';
+    if (chicago.round > 1) {
+        html += '<tr class="sum"><td colspan="4">Mind összesen</td><td>' + chicago.total[0] +
+            '</td><td>' + chicago.total[1] + '</td></tr>';
+    }
+    el.innerHTML = html + '</table>';
 }
 
 function denomAllowed(level, denom) { // magasabb-e ez a licit a jelenleginel
@@ -478,6 +527,7 @@ function resetGameView() {
     partnerSeat = -1;
     partnerCards = [];
     specHands = null;
+    chicago = null;
     declarerSeat = -1;
     turnSeat = -1;
     playing = false;
@@ -607,6 +657,14 @@ document.getElementById('leave-yes').addEventListener('click', (e) => {
     try { sessionStorage.removeItem('bridgeName'); } catch (err) { }
     setTimeout(() => location.reload(), 200); // vissza a belepo kepernyore
 });
+document.getElementById('score-help-butt').addEventListener('click', (e) => {
+    e.preventDefault();
+    showDiv('score-modal', 'flex');
+});
+document.getElementById('score-close').addEventListener('click', (e) => {
+    e.preventDefault();
+    hideDiv('score-modal');
+});
 document.getElementById('leave-no').addEventListener('click', (e) => {
     e.preventDefault();
     hideDiv('leave-modal');
@@ -697,6 +755,12 @@ const onEntrySubmitted = (e) => {
             renderSeats();
             renderInfo();
         });
+        sock.on('chicago', (d) => { // kor, leosztas, szkorhelyzet es eredmenylap
+            chicago = d;
+            renderSeats();
+            renderBidHistory();
+            renderInfo();
+        });
         sock.on('bidTurn', (opts) => { // en jovok a licitben
             showBidPanel(opts);
         });
@@ -777,12 +841,15 @@ const onEntrySubmitted = (e) => {
                 }
                 if (data.level !== undefined) { // sarga eredmenyablak
                     const kontraTxt = data.kontraLevel === 1 ? ' (kontra)' : (data.kontraLevel === 2 ? ' (rekontra)' : '');
-                    const diffTxt = (data.diff >= 0 ? '+' : '') + data.diff;
+                    const side = data.pts[0] > 0 ? 'É-D' : (data.pts[1] > 0 ? 'K-NY' : '');
+                    const ptsTxt = side ? side + ': +' + Math.max(data.pts[0], data.pts[1]) + ' pont' : '0 pont';
+                    const roundTxt = data.roundOver ? '<div>Vége a körnek: É-D <b>' + data.roundTotal[0] +
+                        '</b> – K-NY <b>' + data.roundTotal[1] + '</b></div>' : '';
                     document.getElementById('result-lines').innerHTML =
                         '<div>Bemondás: <b>' + data.level + DENOM_LABELS[data.denom] + kontraTxt +
                         '</b> (' + data.declarerName + ')</div>' +
                         '<div>A felvevők ' + '<b>' + data.declTricks + '</b> ütést vittek (kellett: ' + data.needed + ')</div>' +
-                        '<div>Eredmény: <b>' + diffTxt + '</b></div>';
+                        '<div>Eredmény: <b>' + ptsTxt + '</b></div>' + roundTxt;
                     showDiv('result-modal', 'flex');
                 }
             };

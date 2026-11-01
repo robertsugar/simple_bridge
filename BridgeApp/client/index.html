@@ -18,13 +18,16 @@
         <p id="player-list"></p>
         <div id="game-info">
           <div id="info-parti"></div>
+          <div id="info-szkor"></div>
           <div id="info-bemondas"></div>
           <div id="info-turn"></div>
           <div id="info-utesek"></div>
+          <div id="info-chicago"></div>
           <div id="info-licit"></div>
         </div>
         <div class="sidebar-bottom">
           <button id="leave-butt">Kilépés</button>
+          <button id="score-help-butt">Pontozás</button>
         </div>
       </div>
       <div class="game-place">
@@ -80,6 +83,61 @@
               <button id="leave-yes">Igen, kilépek</button>
               <button id="leave-no">Mégse</button>
             </div>
+          </div>
+        </div>
+        <div id="score-modal">
+          <div id="score-box">
+            <div id="score-title">Pontozás (Chicago)</div>
+            <h3>A kör</h3>
+            <p>Egy kör 4 leosztás. Minden leosztás külön számít. A pontok az É-D és a K-NY vonalhoz tartoznak.
+              Ha mindenki passzol, ugyanaz az osztó oszt újra.</p>
+            <h3>Szkórhelyzet</h3>
+            <p>A bellben levő vonal ülésbetűje piros. A bellben levő vonal több pontot kap és több pontot veszít.</p>
+            <table>
+              <tr><th>Leosztás</th><th>Szkórhelyzet</th><th>Példa: É az első osztó</th></tr>
+              <tr><td>1.</td><td>általános mans</td><td>É oszt: senki sincs bellben</td></tr>
+              <tr><td>2.</td><td>az osztó vonala bellben</td><td>K oszt: K-NY bellben</td></tr>
+              <tr><td>3.</td><td>az osztó vonala bellben</td><td>D oszt: É-D bellben</td></tr>
+              <tr><td>4.</td><td>általános bell</td><td>NY oszt: mindkét vonal bellben</td></tr>
+            </table>
+            <h3>Ütésértékpont (a hat feletti bemondott ütésekért)</h3>
+            <p>Treff, káró: 20. Kőr, pikk: 30. Szanzadu: az első ütés 40, a többi 30.
+              Kontrázva kétszer, rekontrázva négyszer ennyi.
+              Legalább 100 ütésértékpont: <b>gém</b>. Kevesebb: <b>részírás</b>.</p>
+            <h3>Jutalmak teljesített felvételért</h3>
+            <table>
+              <tr><th></th><th>Mansban</th><th>Bellben</th></tr>
+              <tr><td>Részírás</td><td>50</td><td>50</td></tr>
+              <tr><td>Gém</td><td>300</td><td>500</td></tr>
+              <tr><td>Kisszlem (12 ütés)</td><td>+500</td><td>+750</td></tr>
+              <tr><td>Nagyszlem (13 ütés)</td><td>+1000</td><td>+1500</td></tr>
+              <tr><td>Teljesített kontrázott felvétel</td><td>+50</td><td>+50</td></tr>
+              <tr><td>Teljesített rekontrázott felvétel</td><td>+100</td><td>+100</td></tr>
+            </table>
+            <h3>Szűrtrükk (a felvételen felüli ütés)</h3>
+            <table>
+              <tr><th></th><th>Mansban</th><th>Bellben</th></tr>
+              <tr><td>Kontra nélkül</td><td>az ütésérték</td><td>az ütésérték</td></tr>
+              <tr><td>Kontrázva</td><td>100</td><td>200</td></tr>
+              <tr><td>Rekontrázva</td><td>200</td><td>400</td></tr>
+            </table>
+            <h3>Bukás (az ellenvonal kapja)</h3>
+            <table>
+              <tr><th></th><th colspan="3">Mansban</th><th colspan="3">Bellben</th></tr>
+              <tr><th></th><th>kontra nélkül</th><th>kontrázva</th><th>rekontrázva</th>
+                <th>kontra nélkül</th><th>kontrázva</th><th>rekontrázva</th></tr>
+              <tr><td>1. bukás</td><td>50</td><td>100</td><td>200</td><td>100</td><td>200</td><td>400</td></tr>
+              <tr><td>2. és 3. bukás</td><td>50</td><td>200</td><td>400</td><td>100</td><td>300</td><td>600</td></tr>
+              <tr><td>Minden további</td><td>50</td><td>300</td><td>600</td><td>100</td><td>300</td><td>600</td></tr>
+            </table>
+            <h3>Példák</h3>
+            <ul>
+              <li>4&spades; bellben, 10 ütés: 4 × 30 = 120, gém bellben 500. Összesen <b>620</b>.</li>
+              <li>2<span class="red">&hearts;</span> mansban, 9 ütés: 2 × 30 = 60, részírás 50, egy szűrtrükk 30. Összesen <b>140</b>.</li>
+              <li>3SZ kontrázva mansban, 7 ütés (2 bukás): 100 + 200. Az ellenvonal kap <b>300</b> pontot.</li>
+            </ul>
+            <p class="score-src">Forrás: MBSZ Szabálykönyv 2024, 77. szakasz.</p>
+            <button id="score-close">Bezárás</button>
           </div>
         </div>
         <div id="confirm-modal">

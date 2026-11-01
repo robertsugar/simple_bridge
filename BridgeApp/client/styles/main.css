@@ -30,9 +30,9 @@ body {
 .sidebar-bottom {
     padding: 10px;
 }
-#leave-butt {
-    font-size: 17px;
-    padding: 7px 18px;
+#leave-butt, #score-help-butt {
+    font-size: 16px;
+    padding: 6px 12px;
     cursor: pointer;
 }
 /* Nagy betus jatekinfo: hanyadik parti, bemondas, utesek vonalankent */
@@ -74,6 +74,41 @@ body {
 }
 #info-licit {
     font-size: 15px;
+}
+#info-szkor {
+    font-size: 20px;
+    margin: -8px 0 14px 0;
+}
+/* Chicago eredmenylap a bal oldalon */
+#info-chicago {
+    font-size: 15px;
+    margin-bottom: 14px;
+}
+#info-chicago table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: center;
+    background-color: white;
+    margin-top: 4px;
+    font-size: 12px;
+}
+#info-chicago th {
+    padding: 2px 1px;
+    border-bottom: 1px solid #cccccc;
+}
+#info-chicago td {
+    padding: 1px;
+}
+#info-chicago tr.sum td {
+    font-weight: bold;
+    border-top: 1px solid #cccccc;
+}
+/* Bellben levo vonal: piros ulesbetu (nevtabla es licittabla) */
+.plate.vul .badge {
+    background-color: #c02020;
+}
+th.vul {
+    color: #c02020;
 }
 #info-licit table {
     width: 100%;
@@ -544,7 +579,7 @@ body {
 }
 
 /* Megerosites (Uj parti) es kieses ablakok */
-#confirm-modal, #leave-modal {
+#confirm-modal, #leave-modal, #score-modal {
     display: none;
     position: fixed;
     top: 0;
@@ -566,7 +601,7 @@ body {
     color: black;
     max-width: 560px;
 }
-#confirm-title, #leave-title {
+#confirm-title, #leave-title, #score-title {
     font-size: 27px;
     font-weight: bold;
     margin-bottom: 14px;
@@ -638,4 +673,47 @@ body {
     font-size: 18px;
     padding: 6px 16px;
     margin-top: 10px;
+}
+
+/* Pontozasi puska: gorgetheto ablak tablazatokkal */
+#score-box {
+    background-color: white;
+    border: 3px solid #7a5c00;
+    border-radius: 12px;
+    padding: 20px 32px;
+    font-size: 17px;
+    color: black;
+    max-width: 760px;
+    max-height: 88vh;
+    overflow-y: auto;
+}
+#score-box h3 {
+    margin: 16px 0 6px 0;
+    font-size: 19px;
+}
+#score-box p {
+    margin: 4px 0;
+}
+#score-box table {
+    border-collapse: collapse;
+    margin: 4px 0;
+}
+#score-box th, #score-box td {
+    border: 1px solid #cccccc;
+    padding: 3px 10px;
+    text-align: center;
+}
+#score-box td:first-child {
+    text-align: left;
+}
+#score-box .score-src {
+    margin-top: 14px;
+    font-size: 14px;
+    color: #555555;
+}
+#score-close {
+    margin-top: 12px;
+    font-size: 18px;
+    padding: 6px 20px;
+    cursor: pointer;
 }

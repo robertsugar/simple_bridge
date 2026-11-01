@@ -95,7 +95,7 @@ async function clickWhenVisible(page, sel, timeout) {
     assert(bidRow[0].includes('1') && bidRow[1] === '' && bidRow[2] === '' && bidRow[3] === '',
         'Anna (É, oszto) licitje az elso oszlopban van: [' + bidRow.join('|') + ']');
     const partiText = await pages[0].$eval('#info-parti', el => el.innerText);
-    assert(partiText === '1. parti', 'jatekinfo: "' + partiText + '"');
+    assert(partiText === '1. kör – 1/4. leosztás', 'jatekinfo (Chicago): "' + partiText + '"');
     await pages[1].screenshot({ path: OUT + '/ui-1b-bidtable.png' });
     for (const p of [pages[1], pages[2], pages[3]]) {
         await clickWhenVisible(p, '#passz-butt');
@@ -199,6 +199,27 @@ async function clickWhenVisible(page, sel, timeout) {
         document.querySelectorAll('.dummy-vert').length +
         document.querySelectorAll('.fan-full:not(.own-fan)').length);
     assert(stale === 0, 'uj partiban nem ragad be az elozo terito elrendezese');
+    // Chicago: 2. leosztas, K oszt -> K-NY bellben; az eredmenylapon az 1. leosztas sora
+    await pages[0].waitForFunction(() => document.getElementById('info-parti').innerText.includes('2/4'));
+    const chi = await pages[0].evaluate(() => ({
+        parti: document.getElementById('info-parti').innerText,
+        szkor: document.getElementById('info-szkor').innerText,
+        vulPlates: Array.from(document.querySelectorAll('.plate.vul .badge')).map(b => b.innerText).sort().join(','),
+        rows: document.querySelectorAll('#info-chicago tr').length
+    }));
+    assert(chi.parti === '1. kör – 2/4. leosztás' && chi.szkor.includes('K-NY bellben'),
+        'Chicago info: "' + chi.parti + '", "' + chi.szkor + '"');
+    assert(chi.vulPlates === 'K,NY', 'a bellben levo K-NY vonal ulesbetuje piros (' + chi.vulPlates + ')');
+    assert(chi.rows === 3, 'eredmenylap: fejlec + 1. leosztas + kor osszesen (' + chi.rows + ' sor)');
+    await pages[0].click('#score-help-butt');
+    const help = await pages[0].evaluate(() => ({
+        shown: getComputedStyle(document.getElementById('score-modal')).display !== 'none',
+        text: document.getElementById('score-box').innerText
+    }));
+    assert(help.shown && help.text.includes('Szkórhelyzet') && help.text.includes('Szűrtrükk') && help.text.includes('Bukás'),
+        'a Pontozas gomb megnyitja a magyar puskat');
+    await pages[0].screenshot({ path: OUT + '/ui-9-puska.png' });
+    await pages[0].click('#score-close');
     const backs3 = await pages[1].evaluate(() => document.querySelectorAll('.cardback').length);
     assert(backs3 === 39, 'uj partiban ujra 39 hatlap latszik vizszintesen (' + backs3 + ')');
 
@@ -229,7 +250,7 @@ async function clickWhenVisible(page, sel, timeout) {
         return el && el.style.display === 'flex';
     }, { timeout: 90000 });
     const resultText = await pages[1].$eval('#result-lines', el => el.innerText);
-    assert(resultText.includes('Bemondás') && /Eredmény: [+-]?\d/.test(resultText),
+    assert(resultText.includes('Bemondás') && /Eredmény: ((É-D|K-NY): \+\d+|0) pont/.test(resultText),
         'eredmenyablak: "' + resultText.replace(/\n/g, ' | ') + '"');
     await pages[1].screenshot({ path: OUT + '/ui-5-eredmeny.png' });
     await pages[2].click('#result-ujparti');
