@@ -72,6 +72,7 @@ let history = [];          // visszavonashoz: {snap, actor} minden akcio elott
 // partinal ugyanaz oszt ujra, a leosztas sorszama marad)
 let chicago = { round: 1, dealNo: 1, rows: [], roundTotal: [0, 0], total: [0, 0] };
 let vul = [false, false];  // a futo leosztas szkorhelyzete: [0-2 bellben, 1-3 bellben]
+let dealSeated = [];       // a futo leosztasban ult emberek nevei: kibickent sem latjak minden lapot
 
 function shuffle(arr) {
     var ctr = arr.length, temp, index;
@@ -399,6 +400,7 @@ function newGame() {
     vul = vulnerability(chicago.dealNo, dealer);
     const deck = shuffle(DECK.slice());
     const names = players.map(p => p === null ? '?' : p.name);
+    dealSeated = players.filter(p => p !== null && !p.bot).map(p => p.name);
     for (let i = 0; i < 4; i++) {
         hands[i] = deck.slice(i * 13, i * 13 + 13);
         players[i].sock.emit('deal', { seat: i, cards: hands[i], dealer: dealer, names: names, gameNo: gameNo });
@@ -412,6 +414,13 @@ function newGame() {
     promptBid();
 }
 
+// Kibic csak akkor latja mind a negy kezet, ha ebben a leosztasban nem ult
+// (felallas vagy kilepes utan ne lessen be, majd uljon vissza)
+function seesAllHands(sock) {
+    const spec = spectators.find(x => x.sock === sock);
+    return spec !== undefined && !dealSeated.includes(spec.name);
+}
+
 // Ujracsatlakozo jatekosnak a teljes jatekallas ujrakuldese
 function resync(seat, sock) {
     if (gameNo === 0) return;
@@ -421,7 +430,7 @@ function resync(seat, sock) {
     sock.emit('deal', {
         seat: seat, cards: seat >= 0 ? hands[seat] : [], dealer: currentDealer, names: names,
         gameNo: gameNo, counts: sendCounts, tricks: tricks,
-        allHands: seat < 0 ? hands : undefined // a nezelodo mindenki lapjat latja
+        allHands: seat < 0 && seesAllHands(sock) ? hands : undefined // a kibic mindenki lapjat latja
     });
     sock.emit('chicago', chicagoState());
     bidsLog.forEach(b => sock.emit('bidMade', b));
@@ -740,6 +749,7 @@ io.on('connection', (sock) => {
         if (!spec) return;
         spectators = spectators.filter(x => x.sock !== sock);
         players[s] = { sock: sock, name: spec.name, connected: true };
+        if (!dealSeated.includes(spec.name)) dealSeated.push(spec.name);
         io.emit('message', spec.name + ' leült (' + SEAT_NAMES[s] + ').');
         sendSeats();
         sendPlist();
@@ -750,10 +760,8 @@ io.on('connection', (sock) => {
     sock.on('stand', () => {
         const seat = seatOf(sock);
         if (seat < 0) return;
-        if (phase === 'licit' || phase === 'jatek') {
-            sock.emit('message', 'Játék közben nem lehet felállni.');
-            return;
-        }
+        // Jatek kozben is felallhat: a hely kiurul (bot vagy mas ulhet oda,
+        // vagy o maga visszaulhet), o pedig kibickent nezi tovabb
         const name = players[seat].name;
         players[seat] = null;
         spectators.push({ sock: sock, name: name });
@@ -761,6 +769,7 @@ io.on('connection', (sock) => {
         sendSeats();
         sendPlist();
         broadcastState();
+        if (phase === 'licit' || phase === 'jatek') resync(-1, sock); // kibic nezet: minden lap
     });
 
     sock.on('leave', () => { // kilepes: felall es eltunik a jatekosok kozul
@@ -798,14 +807,9 @@ io.on('connection', (sock) => {
     sock.on('kick', (s) => {
         if (!Number.isInteger(s) || s < 0 || s > 3) return;
         if (players[s] === null) return;
-        const seated = seatOf(sock) >= 0;
-        const present = seated || spectators.some(x => x.sock === sock);
-        if (players[s].bot) {
-            if (!present) return; // botot barmely belepett (nezelodo is) elkuldhet
-        }
-        else {
-            if (!seated || players[s].connected) return; // megszakadt embert csak ulo dobhat ki
-        }
+        const present = seatOf(sock) >= 0 || spectators.some(x => x.sock === sock);
+        if (!present) return; // barmely belepett (kibic is) elkuldhet
+        if (!players[s].bot && players[s].connected) return; // embert csak megszakadt kapcsolatnal
         const name = players[s].name;
         players[s] = null;
         io.emit('message', name + ' helyét felszabadították - bárki leülhet oda.');

@@ -401,6 +401,43 @@ async function run() {
     const outcome2 = await botGame2Done;
     assert(true, 'a negy bot vegigjatszotta a partit (' + outcome2 + ')');
 
+    console.log('14. Kibic elkuldi a jatek kozben megszakadt embert (csak botok ulnek mellette)...');
+    nezo.emit('kick', 0);
+    await waitSeats(() => seatsNow[0] === null, 'bot elkuldese');
+    const ember = await connectPlayer('Ember');
+    await new Promise(r => setTimeout(r, 100));
+    ember.emit('sit', 0);
+    await waitSeats(() => seatsNow[0] !== null && seatsNow[0].name === 'Ember', 'Ember leul');
+    const emberDeal = waitFor(ember, 'deal', 5000);
+    ember.emit('ujparti');
+    await emberDeal;
+    nezo.emit('kick', 0); // kapcsolodo embert nem lehet elkuldeni
+    await new Promise(r => setTimeout(r, 300));
+    assert(seatsNow[0] !== null && seatsNow[0].name === 'Ember', 'kapcsolodo embert a kibic nem kuldhet el');
+    // Felallas jatek kozben: a hely kiurul, kibic lesz, de ebben a partiban nem latja
+    // a tobbiek lapjait; visszaulve a sajat lapjait visszakapja
+    const standDeal = waitFor(ember, 'deal', 5000);
+    ember.emit('stand');
+    await waitSeats(() => seatsNow[0] === null, 'felallas jatek kozben');
+    const sd = await standDeal;
+    assert(sd.seat === -1 && sd.allHands === undefined, 'jatek kozben felallt, de ebben a partiban nem latja a tobbiek lapjait');
+    // kilepes utan ugyanazzal a nevvel kibickent visszajonve sem latja
+    ember.emit('leave');
+    await new Promise(r => setTimeout(r, 200));
+    const rejoinDeal = waitFor(ember, 'deal', 5000);
+    ember.emit('name', 'Ember');
+    const rd = await rejoinDeal;
+    assert(rd.seat === -1 && rd.allHands === undefined, 'kilepes es visszalepes utan sem latja ebben a partiban a lapokat');
+    const sitDeal = waitFor(ember, 'deal', 5000);
+    ember.emit('sit', 0);
+    const sitD = await sitDeal;
+    assert(sitD.seat === 0 && sitD.cards.length > 0, 'visszault, es visszakapta a lapjait (' + sitD.cards.length + ')');
+    ember.close();
+    await waitSeats(() => seatsNow[0] !== null && !seatsNow[0].connected, 'Ember kapcsolata megszakad');
+    nezo.emit('kick', 0);
+    await waitSeats(() => seatsNow[0] === null, 'megszakadt ember elkuldese kibickent');
+    assert(true, 'a kibic elkuldte a megszakadt embert, a hely ures');
+
     console.log(failed ? '\nVANNAK HIBAK!' : '\nMinden proba sikeres.');
     socks.forEach(s => s.close());
     finish();

@@ -239,7 +239,7 @@ function renderPlate(abs) {
         b.onclick = () => sock.emit('addBot', abs);
         plate.appendChild(b);
     }
-    if (seatInfo !== null && seatInfo.name === userName && (!inGame || gameEnded)) { // felallas
+    if (seatInfo !== null && seatInfo.name === userName) { // felallas (jatek kozben is: a hely kiurul, kibic lesz)
         const b = document.createElement('button');
         b.id = 'stand-btn';
         b.className = 'seat-btn';
@@ -247,8 +247,8 @@ function renderPlate(abs) {
         b.onclick = () => sock.emit('stand');
         plate.appendChild(b);
     }
-    if (seatInfo !== null && ((seatInfo.bot && userName) || (!seatInfo.connected && !seatInfo.bot && myLobby >= 0))) {
-        // botot barki elkuldhet; megszakadt embert csak ulo jatekos kuldhet el
+    if (seatInfo !== null && userName && (seatInfo.bot || !seatInfo.connected)) {
+        // botot es megszakadt jatekost barki elkuldhet (kibic is)
         const b = document.createElement('button');
         b.className = 'seat-btn kick-btn';
         b.textContent = 'Elküld';
